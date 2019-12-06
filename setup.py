@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------
-# This file is part of the hydrangea-tools package
+# This file is part of the hydrangea tools package
 # Copyright (C) 2019 Yannick Bahe (bahe@strw.leidenuniv.nl)
 #
 # This program is free software: you can redistribute it and/or modify
@@ -22,7 +22,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="hydrangea_tools",
+    name="hydrangea",
     version="0.1",
     author="Yannick Bahe",
     author_email="bahe@strw.leidenuniv.nl",
