@@ -10,8 +10,13 @@ from operator import mul
 from astropy.cosmology import Planck13
 import astropy.units as u
 
-import sim_tools as st
-import yb_utils as yb
+import hydrangea.crossref as hxr
+import hydrangea.hdf5 as hdf5
+from hydrangea.split_file import SplitFile
+
+# TEMPORARY IMPORTS OF OLD PACKAGES
+import sim_tools as st # --> get_conv_astro, eagleread 
+import yb_utils as yb  # --> read_hdf5(_attribute), create_reverse_list
 
 from pdb import set_trace
 
@@ -125,7 +130,7 @@ class ReadRegion:
             
         # Set up map file, and check whether it exists
         if mapFile is None:
-            mapFile = yb.dir(fileName) + '/ParticleMap.hdf5'
+            mapFile = os.path.dirname(fileName) + '/ParticleMap.hdf5'
         if not os.path.exists(mapFile):
             self.load_full = True
             
