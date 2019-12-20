@@ -2,6 +2,9 @@
 Convenience routines for reading and writing data in HDF5 format
 """
 
+import h5py as h5
+import numpy as np
+
 def check_attribute(fileName, container, attribute):
     """
     Check whether an HDF5 attribute exists.
