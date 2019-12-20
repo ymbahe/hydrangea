@@ -1,45 +1,32 @@
 # Blank file
 
-def clone_dir(dir, loc = 'freya'):
-    """
-    Construct a 'clone' of a specified directory structure.
-
-    This is used to enable storing experimental/development/specialized outputs
-    in separate locations from the 'main' simulation repository, but with an
-    exactly analogous internal structure.
-
-    Args:
-        dir (string): The full path of the directory to clone.
-        loc (string, optional): The branch to clone the directory to. Can be
-            one of 'freya' or 'virgo'.
-    
-    Returns:
-        string: modified directory name in the specified branch.
-    """
-        
-    dir_parts = dir.split('/')
-
-    num_Hydrangea = dir_parts.count('Hydrangea')
-    if dir_parts.count('Hydrangea') == 0:
-        print("The input path '" + dir + "' does not seem to contain a directory called 'Hydrangea'...")
-        sys.exit(44)
-
-    last_of_pre = dir_parts.index('Hydrangea')
-    first_special = last_of_pre + 1
-
-    special_part = '/'.join(dir_parts[first_special:])
-
-    if loc == 'freya':
-        return "/freya/ptmp/mpa/ybahe/HYDRANGEA/ANALYSIS/" + special_part
-    elif loc == 'virgo':
-        return "/virgo/scratch/ybahe/HYDRANGEA/ANALYSIS/" + special_part
-    else:
-        print("Do not understand requested redirect site '" + loc + "'")
-        set_trace()
+from astropy.io import ascii
+from astropy.cosmology import Planck13
+import numpy as np
+import os
+from pdb import set_trace()
 
 def get_snepshot_indices(rundir, list='basic'):
     """
     Extract type, number, and aexp for snepshots from a specified list.
+
+    Parameters
+    ----------
+    rundir : str
+        The base directory of the simulation.
+    list : str, optional
+        The snepshot list to extract (default: 'basic')
+
+    Returns
+    -------
+    rootIndex : np.array(int)
+        The root indices of all snepshots in specified list.
+    aExp : np.array(float):
+        The expansion factor of all snepshots in specified list.
+    sourceType : np.array(string)
+        For each snepshot, whether it is a 'snap' or 'snip'.
+    sourceNum : np.array(int)
+        Indices of snepshot in its category (i.e. snap/snipshot).
     """
     
     snepdir = rundir + '/sneplists/'
@@ -48,46 +35,61 @@ def get_snepshot_indices(rundir, list='basic'):
     data = ascii.read(fileName)
     
     rootIndex = np.array(data['rootIndex'])
-    aexp = np.array(data['aexp'])
+    aExp = np.array(data['aexp'])
     sourceType = np.array(data['sourceType'])
     sourceNum = np.array(data['sourceNum'])
     
     return rootIndex, aexp, sourceType, sourceNum
     
-
-def snap_times(conv = None, list = None):
-    """
-    Return the times of all Hydrangea snapshots.
+def snep_times(timeType='aexp', list='allsnaps'):
+    """Return the times of all snepshots in a particular list.
 
     By default, the expansion factors of the 30 snapshots are returned.
-    Optionally, two arguments can be provided:
 
-    Args:
-        conv (string, 'zred' or 'age'): convert the expansion factors to 
-            redshift or age of the Universe (as appropriate).
-        list (string): name (without directories) of the output file to read.
+    Parameters
+    ----------
+    timeType : string
+        Specified the 'time' flavour to be returned. Options are:
+            'aexp' [default]: Expansion factor
+            'zred': Redshift
+            'age': Age of the Universe [Gyr]
+            'lbt': Lookback time from z = 0 [Gyr]
+    list : string
+        The snepshot list for which to load times. Options are:
+            'z0_only': 1 snapshot at z = 0
+            'regsnaps': 28 regular snapshots
+            'allsnaps' [default]: 30 snapshots
+            'basic': 109 snepshots at Delta_t = 125 Myr
+            'default_long': basic + filler snipshots to Delta_t = 25 Myr
+            'short_movie': 217 snepshots at Delta_t = 62.5 Myr
+            'full_movie': 1081 snepshots at Delta_t = 12.5 Myr
+
+    Returns
+    -------
+    np.array(float)
+        The desired snepshot times.
+
+    Note
+    ----
+    This function retrieves the target time of the snepshot, which may 
+    deviate slightly from the the actual output. Use read_snepshot_time() 
+    for the latter.
+    
     """
-    
-    if list is None:
-        snaptimes_file = currDir + '/hydrangea/OutputLists/hydrangea_snapshots_plus.dat'
+
+    currDir = os.path.dirname(os.path.realpath(__file__)) + "/"
+    snaptimes_file = currDir + 'OutputLists/' + list + '.dat'
+
+    aExp = np.array(ascii.read(snaptimes_file, format = 'no_header')['col1'])
+
+    if timeType == 'aexp':
+        return aExp
+    elif timeType == 'zred':
+        return 1/aExp - 1
+    elif timeType == 'age':
+        return Planck13.age(1/aExp - 1).to(u.Gyr).value
+    elif timeType == 'lbt':
+        return Planck13.lookback_time(1/aExp - 1).to(u.Gyr).value
     else:
-        snaptimes_file = currDir + '/hydrangea/OutputLists/' + list + '.dat'
-
-    snap_times = np.array(ascii.read(snaptimes_file, format = 'no_header')['col1'])
-
-    if conv is None:
-        return snap_times
-
-    elif conv == 'zred':
-        return 1/snap_times - 1
-
-    elif conv == 'age':
-        return Planck13.age(1/snap_times - 1).to(u.Gyr).value
-
-    else:
-        print("I do not know what you mean by '" + conv + "'...")
+        print("I do not know what you mean by '" + timeType + "'...")
         set_trace()
-
-    
-def test():
-    print("Can you see me still?")
