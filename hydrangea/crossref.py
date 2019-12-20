@@ -92,12 +92,14 @@ class Gate:
                       "data set...")
                 set_trace()
 
+            self.nInt = len(idsInt)
+                
             # Can we use the direct (reverseID-list-based) method?
             use_direct = True
             if force_sort:
                 use_direct = False
             elif sort_below is not None:
-                if max(len(idsExt), len(idsInt)) > sort_below:
+                if max(len(idsExt), len(idsInt)) < sort_below:
                     use_direct = False
             elif max(np.max(idsExt), np.max(idsInt)) > max_direct:
                 use_direct = False
@@ -110,7 +112,7 @@ class Gate:
                     self.revIDs = revIDs
 
                 # Primary result is the matches of ext in int:
-                self.ie_int = query_array(idsExt, revIDs)
+                self.ie_int = query_array(revIDs, idsExt)
                 self.ie_matched = np.nonzero(self.ie_int >= 0)[0]
                 
             else:
@@ -126,9 +128,11 @@ class Gate:
                 self.revIDs = revIDs
 
             # Account for possibility of revID array being too short
-            self.ie_int = query_array(idsExt, revIDs)
+            self.ie_int = query_array(revIDs, idsExt)
             self.ie_matched = np.nonzero(self.ie_int >= 0)[0]
 
+            self.nInt = np.max(revIDs)
+            
     def in_int(self, index=None):
         """
         Return the indices of the external data in the internal set.
@@ -270,10 +274,10 @@ def create_reverse_list(ids, delete_ids=False, assume_positive=False,
     # Do the actual inversion
     revList = np.zeros(np.int64(maxID+1), dtype = dtype)-1
     if assume_positive:
-        revlist[ids] = np.arange(len(ids))
+        revList[ids] = np.arange(len(ids))
     else:
         ind_good = np.nonzero(ids >= 0)[0]
-        revlist[ids[ind_good]] = ind_good
+        revList[ids[ind_good]] = ind_good
 
     # Delete input if necessary, to save space
     if delete_ids:
@@ -400,7 +404,7 @@ def query_array(array, indices, default=-1):
     -------
     values : np.array
         The array values of the specified indices, with out-of-bounds 
-        indices set to the default.
+        indices (negative or >= N_arr) set to the default.
 
     Note
     ----
@@ -417,11 +421,12 @@ def query_array(array, indices, default=-1):
 
     """
     
-    if np.max(indices) < len(array):
+    if np.min(indices) >= 0 and np.max(indices) < len(array):
         return array[indices]
     else:
         values = np.zeros(len(indices), dtype = array.dtype) + default
-        ind_in_range = np.nonzero(indices < len(array))[0]
+        ind_in_range = np.nonzero((indices < len(array)) &
+                                  (indices >= 0))[0]
         values[ind_in_range] = array[indices[ind_in_range]]
         return values
     
