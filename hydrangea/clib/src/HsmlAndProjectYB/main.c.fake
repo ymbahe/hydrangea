@@ -1,0 +1,434 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+#include <omp.h>
+
+#include "allvars.h"
+
+#include "proto.h"
+
+double get_wall_time();
+
+int findHsmlAndProjectYB_3D(int argc, void *argv[])
+
+{
+
+  double dStartHsml = 0, dEndHsml = 0;
+
+  if(argc != 25)
+    {
+      fprintf(stderr, "\n\nWrong number of arguments! (found %d) \n\n", argc);
+      exit(0);
+    }
+
+  NumPart = *(int *) argv[0]; 
+  P = (struct particle_data *) argv[1];
+  
+  Hsml = (float *) argv[2];
+  
+  Mass = (float *) argv[3];
+  Quantity = (float *) argv[4];
+
+  Xmin = *(float *) argv[5];
+  Xmax = *(float *) argv[6];
+  Ymin = *(float *) argv[7];
+  Ymax = *(float *) argv[8];
+  Zmin = *(float *) argv[9];
+  Zmax = *(float *) argv[10];
+
+  Xpixels = *(int *) argv[11];
+  Ypixels = *(int *) argv[12];
+  Zpixels = *(int *) argv[13];
+
+  DesDensNgb =  *(int *) argv[14];
+  Hmax = *(float *) argv[15];
+
+  CamPos = (float *) argv[16];
+  CamDir = (float *) argv[17];
+  CamAngle = (float *) argv[18];
+  CamFOV = (float *) argv[19];
+
+  Value =         (float *) argv[20];
+  ValueQuantity = (float *) argv[21];
+
+  TempMap =         (float *) argv[22];
+  TempMapQuantity = (float *) argv[23];
+  
+  FlagUseHsml = *(int *) argv[24];
+
+  printf("CamDir = [%g, %g, %g]\n", CamDir[0], CamDir[1], CamDir[2]);
+  printf("N=%d\n", NumPart);
+
+
+  if(FlagUseHsml == 0) {
+  
+  printf("peano-hilbert order...\n");
+  peano_hilbert_order();
+  printf("done.\n");
+
+  tree_treeallocate(2.0 * NumPart, NumPart);
+  Softening = (Xmax-Xmin)/Xpixels/100;
+
+  printf("build tree...\n");
+  tree_treebuild();
+  printf("done.\n");
+
+  printf("finding neighbours...\n");
+  dStartHsml = get_wall_time();
+  determine_hsml();
+  dEndHsml = get_wall_time();
+  printf("done (took %g sec.)\n", dEndHsml-dStartHsml);
+
+  tree_treefree();
+  }
+
+  printf("projecting...\n");
+  make_map();
+  printf("done\n");
+
+  return 0;
+}
+
+void determine_hsml(void)
+{
+  int i;
+
+#pragma omp parallel for schedule(guided)
+  for(i = 0; i < NumPart; i++)
+    {
+      int signal = 0;
+      double h = 0;
+
+      if((i % (NumPart / 100)) == 0)
+	{
+	  printf("x");
+	  fflush(stdout);
+	}
+
+      /*
+      if(i > (signal / 100.0) * NumPart)
+        {
+          printf("x");
+          fflush(stdout);
+          signal++;
+        }
+      */
+
+      if(Hsml[i] == 0)
+        Hsml[i] = h = ngb_treefind(P[i].Pos, DesDensNgb, h * 1.1);
+    }
+
+  printf("\n");
+}
+
+
+
+void normalize_vector_float(float* vec)
+{
+  double dLength;
+  int i;
+
+  dLength = sqrt(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]);
+
+  for (i = 0; i < 3; i++)
+    vec[i] /= dLength;
+  
+  return;
+}
+
+void normalize_vector_double(double* vec)
+{
+  double dLength;
+  int i;
+
+  dLength = sqrt(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]);
+
+  printf("NVD: Length=%g\n", dLength);
+
+  for (i = 0; i < 3; i++)
+    vec[i] /= dLength;
+  
+  return;
+}
+
+
+void make_map(void)
+{
+  int i, j, k, n, ii, iix, iiy, iiz;
+  int nx, ny;
+  double epsX[3], epsXDash[3], epsY[3], epsYDash[3];
+  double hmin, hmax;
+  double pixelsize, pixSizeRel;
+  double dLTemp = 0, sinrho = 0, cosrho = 0;
+  int flagPerspective;
+  double xMaxRef, yMaxRef;
+
+  double dEndParticles = 0, dStartParticles = 0;
+  
+  double LengthX, LengthY;
+  float *TempMapA;
+  float *TempMapQuantityA;
+
+  /*omp_set_num_threads(4); */
+
+  /* Check if the CamDir variable is set to meaningful value */
+  /* If it is (0,0,0), initialise from CamAngle */
+  /* Otherwise, normalise */
+
+  printf("CamPos set to [%g, %g, %g]\n", CamPos[0], CamPos[1], CamPos[2]);
+
+  printf("ACD[0] = %g, ACD[1] = %g, ACD[2] = %g", fabs(CamDir[0]), fabs(CamDir[1]), fabs(CamDir[2]));
+
+  if(fabs(CamDir[0]) < 1e-3 && fabs(CamDir[1]) < 1e-3 && fabs(CamDir[2]) < 1e-3) {
+
+    printf("... CamDir set to [%g, %g, %g], recalculating...\n", CamDir[0], CamDir[1], CamDir[2]);
+    CamDir[0] = sin(CamAngle[0])*cos(CamAngle[1]);
+    CamDir[1] = sin(CamAngle[0])*sin(CamAngle[1]);
+    CamDir[2] = cos(CamAngle[0]);
+    printf("    CamDir recalculated as [%g, %g, %g] from theta=%g, phi=%g\n", CamDir[0], CamDir[1], CamDir[2], CamAngle[0], CamAngle[1]);
+
+  } else {
+    normalize_vector_float(CamDir);
+  }
+
+  /* Form preliminary new basis vectors */
+  
+  if(CamDir[1] < -0.9999) {
+    epsYDash[0] = 0;
+    epsYDash[1] = 0;
+    epsYDash[2] = 1;
+
+    epsXDash[0] = 1;
+    epsXDash[1] = 0;
+    epsXDash[2] = 0;
+  } else if(CamDir[1] > 0.9999) {
+    epsYDash[0] = 0;
+    epsYDash[1] = 0;
+    epsYDash[2] = -1;
+
+    epsXDash[0] = 1;
+    epsXDash[1] = 0;
+    epsXDash[2] = 0;
+  } else {
+    epsYDash[0] = -CamDir[1]*CamDir[0];
+    epsYDash[1] = 1.0 - CamDir[1]*CamDir[1];
+    epsYDash[2] = -CamDir[1]*CamDir[2];
+
+    dLTemp = epsYDash[0]*epsYDash[0]+epsYDash[1]*epsYDash[1]+epsYDash[2]*epsYDash[2];
+    printf("epsYDash^2=%g\n", dLTemp);
+    normalize_vector_double(epsYDash);
+
+    dLTemp = epsYDash[0]*epsYDash[0]+epsYDash[1]*epsYDash[1]+epsYDash[2]*epsYDash[2];
+    printf("After normalization: epsYDash^2=%g\n", dLTemp);
+
+    /* Form EpsXDash as cross product of CamDir and EpsYDash */
+    epsXDash[0] = CamDir[1]*epsYDash[2] - CamDir[2]*epsYDash[1];
+    epsXDash[1] = CamDir[2]*epsYDash[0] - CamDir[0]*epsYDash[2];
+    epsXDash[2] = CamDir[0]*epsYDash[1] - CamDir[1]*epsYDash[0];
+    dLTemp = epsXDash[0]*epsXDash[0]+epsXDash[1]*epsXDash[1]+epsXDash[2]*epsXDash[2];
+    if(dLTemp > 1.01 || dLTemp < 0.99) {
+      printf("Unexpected value of EpsXDash^2=%g. Terminating.\n", dLTemp);
+      printf("CamDir^2=%g, epsYDash^2=%g, epsYDash=[%g, %g, %g]\n",
+	     CamDir[0]*CamDir[0]+CamDir[1]*CamDir[1]+CamDir[2]*CamDir[2],
+	     epsYDash[0]*epsYDash[0]+epsYDash[1]*epsYDash[1]+epsYDash[2]*epsYDash[2],
+	     epsYDash[0], epsYDash[1], epsYDash[2]);
+      exit(101);
+    }
+  }
+
+  printf("CamAngle = [%g, %g, %g]\n", CamAngle[0], CamAngle[1], CamAngle[2]);
+  printf("Preliminary basis vectors determined as [%g, %g, %g], [%g, %g, %g], [%g, %g, %g]\n" , epsXDash[0], epsXDash[1], epsXDash[2], epsYDash[0], epsYDash[1], epsYDash[2], CamDir[0], CamDir[1], CamDir[2]);
+  
+
+  /* Form final basis vector by applying rho rotation */
+  sinrho = sin(CamAngle[2]);
+  cosrho = cos(CamAngle[2]);
+  
+  for(ii=0; ii<3; ii++) {
+    epsX[ii] = cosrho*epsXDash[ii] + sinrho*epsYDash[ii];
+    epsY[ii] = cosrho*epsYDash[ii] - sinrho*epsXDash[ii];
+  }
+
+  printf("CamAngle = [%g, %g, %g]\n", CamAngle[0], CamAngle[1], CamAngle[2]);
+  printf("Basis vectors determined as [%g, %g, %g], [%g, %g, %g]\n" , epsX[0], epsX[1], epsX[2], epsY[0], epsY[1], epsY[2]);
+  
+
+  /* Check if we are performing orthogonal or perspectivic projection: */
+  if (CamFOV[0] > 1e-3) {
+    flagPerspective = 1;
+    xMaxRef = 1.0 * tan(CamFOV[0]);
+    yMaxRef = 1.0 * tan(CamFOV[1]);
+    pixSizeRel = xMaxRef * xMaxRef / Xpixels / Xpixels; 
+    /*Ypixels = Xpixels*yMaxRef/xMaxRef; */
+    printf("Perspectivic projection (FOV=%g/%g), nX=%d, nY=%d\n", CamFOV[0], CamFOV[1], Xpixels, Ypixels);
+  } else {
+    flagPerspective = 0;
+    LengthX = Xmax-Xmin;
+    LengthY = Ymax-Ymin;
+    /*Ypixels = Xpixels*LengthY/LengthX; */
+    pixelsize = LengthX / Xpixels;
+    hmin = 1.001 * pixelsize / 2;
+    printf("Orthogonal projection, nX=%d, nY=%d\n", Xpixels, Ypixels);
+  }
+
+
+  /* Initialise output map to zero */
+  for(i = 0; i < Xpixels; i++)
+    for(j = 0; j < Ypixels; j++)
+      for (k = 0; k < Zpixels; k++)
+	{
+	  Value[i + j* Ypixels + k * Ypixels * Zpixels] = 0;
+	  ValueQuantity[i + j*Ypixels + k*Ypixels*Zpixels] = 0;
+	}
+
+ 
+  hmax = Hmax;
+
+
+  dStartParticles = get_wall_time();
+
+  TempMapA = (float *) malloc(Xpixels*Ypixels);
+  TempMapQuantityA = (float *) malloc(Xpixels*Ypixels);
+  
+
+#pragma omp parallel for schedule(guided) private(pixelsize, hmin, LengthX, LengthY, TempMapA, TempMapQuantityA)
+  for(n = 0; n < NumPart; n++)
+    {
+      int mii, ix, iy, iz;
+      double xMaxCurr, xMinCurr, yMaxCurr, yMinCurr;
+      double pos[3], posRel[3];
+      double h, r, u, wk;
+      double r2, h2;
+      double sum, x, y, xx, yy, xxx, yyy, zeta;     
+      int minxpix, minypix, maxxpix, maxypix;
+      double dx, dy;
+	
+      if((n % (NumPart / 100)) == 0)
+	{
+	  printf(".");
+	  fflush(stdout);
+	}
+
+      for (mii = 0; mii < 3; mii++)
+	posRel[mii] = P[n].Pos[mii] - CamPos[mii];
+
+      /* Find zeta coordinate */
+      pos[2] = posRel[0]*CamDir[0] + posRel[1]*CamDir[1] + posRel[2]*CamDir[2];
+
+      /*      printf("Particle %d, zeta=%g\n", n, pos[2]); */
+      if(pos[2] < Zmin || pos[2] > Zmax)
+        continue;
+
+      iz = (int) ((pos[2]-Zmin)/(Zmax-Zmin)*((float) Zpixels));
+      if (iz < 0) {
+	printf("WARNING: iz = %d", iz);
+	iz = 0;
+      }
+      if (iz >= Zpixels) {
+	printf("WARNING: iz = %d", iz);
+	iz = Zpixels-1;
+      }
+      
+      /* Invert z-order so we can build image from 0 upwards */
+      iz = Zpixels-iz-1;
+      
+      /*printf("iz=%d, pos[2]=%g, Zmin=%g, Zmax=%g, Zpixels=%d\n", iz, pos[2], Zmin, Zmax, Zpixels); */
+
+      /* Determine particle position on projection plane */
+
+      if(flagPerspective) {
+	xMaxCurr = xMaxRef*pos[2];
+	yMaxCurr = yMaxRef*pos[2];
+	xMinCurr = -xMaxCurr;
+	yMinCurr = -yMaxCurr;
+
+	LengthX = 2.0*xMaxCurr;
+	LengthY = 2.0*yMaxCurr;
+
+	pixelsize = LengthX / Xpixels;
+	hmin = 1.001 * pixelsize / 2;
+
+	/*printf("Set up current pixel size...\n"); */
+
+      } else {
+	xMaxCurr = Xmax;
+	yMaxCurr = Ymax;
+	xMinCurr = Xmin;
+	yMinCurr = Ymin;
+      }
+
+      pos[0] = (posRel[0]*epsX[0] + posRel[1]*epsX[1] + posRel[2]*epsX[2]);
+      pos[1] = (posRel[0]*epsY[0] + posRel[1]*epsY[1] + posRel[2]*epsY[2]);
+      
+      /*
+      printf("pos=[%g, %g]\n", pos[0], pos[1]);
+      printf("x/ymin=[%g, %g], pixsize=%g\n", xMinCurr, yMinCurr, pixelsize); */
+
+      pos[0] = (posRel[0]*epsX[0] + posRel[1]*epsX[1] + posRel[2]*epsX[2] - xMinCurr)/pixelsize;
+      pos[1] = (posRel[0]*epsY[0] + posRel[1]*epsY[1] + posRel[2]*epsY[2] - yMinCurr)/pixelsize;
+      
+      /*printf("xi=%g, upsilon=%g\n", pos[0], pos[1]); */
+
+      h = Hsml[n];
+      
+      if(h < hmin)
+        h = hmin;
+
+      if(h > hmax)
+        h = hmax;
+
+      h /= pixelsize;
+
+      /*
+      if(h > 10)
+	h = 10; 
+      */
+
+      /* printf("h=%g\n", h); */
+
+      if(pos[0] + h < 0 || pos[0] - h >  Xpixels
+         || pos[1] + h < 0 || pos[1] - h > Ypixels)
+        continue;
+ 
+      h2 = h * h;
+      
+      /* determine kernel normalizaton */
+      
+      sum = 0;
+      minxpix = (int) floor(pos[0]-h+0.5);
+      minypix = (int) floor(pos[1]-h+0.5);
+      maxxpix = (int) floor(pos[0]+h-0.5);
+      maxypix = (int) floor(pos[1]+h-0.5);
+
+      
+    } /* ends loop through individual particles */
+
+  free(TempMapA);
+  free(TempMapQuantityA);
+    
+  printf("\n");
+  dEndParticles = get_wall_time();
+  printf("Projecting to pixel grid took %g sec.\n", dEndParticles-dStartParticles);
+
+  /* Final bit: Normalise QUANTITY by dividing by MASS */ 
+  for(iix = 0; iix < Xpixels; iix++)
+    for(iiy = 0; iiy < Ypixels; iiy++)
+      for (iiz = 0; iiz < Zpixels; iiz++)
+	if(Value[iiz + iiy * Zpixels + iix * Zpixels*Ypixels] > 0)
+	  ValueQuantity[iiz + iiy * Zpixels + iix * Zpixels * Ypixels] /= Value[iiz + iiy * Zpixels + iix * Zpixels*Ypixels];
+  
+  printf("Done generating SPH image.\n");
+}
+
+
+double get_wall_time()
+{
+
+  struct timeval time;
+  if(gettimeofday(&time, NULL))
+    return 0;
+  
+  return (double)time.tv_sec + (double)time.tv_usec * .000001;
+}
