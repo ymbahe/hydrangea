@@ -79,9 +79,32 @@ def snep_times(timeType='aexp', list='allsnaps'):
 
     currDir = os.path.dirname(os.path.realpath(__file__)) + "/"
     snaptimes_file = currDir + 'OutputLists/' + list + '.dat'
-
     aExp = np.array(ascii.read(snaptimes_file, format = 'no_header')['col1'])
 
+    return aexp_to_time(aExp, timeType)
+    
+
+def aexp_to_time(aExp, timeType='age'):
+    """Convert expansion factor to other time stamps.
+ 
+    Parameters
+    ----------
+    aExp : float or np.array(float)
+        (Array of) expansion factors to convert.
+    timeType : string
+        Specified the 'time' flavour to be returned. Options are:
+            'aexp': Expansion factor
+            'zred': Redshift
+            'age' [default]: Age of the Universe [Gyr]
+            'lbt': Lookback time from z = 0 [Gyr]
+
+    Returns
+    -------
+    time : float or np.array(float)
+        The desired time stamp corresponding to the input aExp(s).
+
+    """
+    
     if timeType == 'aexp':
         return aExp
     elif timeType == 'zred':
@@ -93,3 +116,38 @@ def snep_times(timeType='aexp', list='allsnaps'):
     else:
         print("I do not know what you mean by '" + timeType + "'...")
         set_trace()
+
+        
+def get_astro_conv(fileName, dataSetName):
+    """Get the conversion factor to astronomical units for a data set.
+
+    Parameters
+    ----------
+    fileName : str
+        The file containing the target data set.
+    dataSetName : str
+        The data set for which to compute the conversion factor.
+
+    Returns
+    -------
+    conv : float or None
+        Conversion factor (None if it could not be determined).
+    """
+
+    try:
+        f = h5.File(fileName, 'r')
+        dSet = f[dataSetName]
+        
+        hscale_exponent = dSet.attrs["h-scale-exponent"]
+        ascale_exponent = dSet.attrs["aexp-scale-exponent"]
+    
+        header = f["/Header"]
+        aexp = header.attrs["ExpansionFactor"]
+        h_hubble = header.attrs["HubbleParam"]
+        f.close()
+
+    except:
+        return None
+    
+    conv_astro = aexp**ascale_exponent * h_hubble**hscale_exponent
+    return conv_astro
