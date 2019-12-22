@@ -4,7 +4,7 @@ from astropy.io import ascii
 from astropy.cosmology import Planck13
 import numpy as np
 import os
-from pdb import set_trace()
+from pdb import set_trace
 
 def get_snepshot_indices(rundir, list='basic'):
     """
