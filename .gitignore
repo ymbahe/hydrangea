@@ -3,6 +3,9 @@
 #*#
 *~
 
+*.so
+*.o
+
 __pycache__
 dist
 hydrangea.egg-info
