@@ -23,7 +23,7 @@ from pdb import set_trace
 
 # ----------- READ_REGION CLASS -------------------
 
-class ReadRegion:
+class ReadRegion(ReaderBase):
     """
     Set up a region for efficient reading of data from snapshot files.
     
@@ -103,7 +103,7 @@ class ReadRegion:
         # Store 'simple' parameters in internal variables
         self.fileName = fileName
         self.pt_num = partType
-        self.pt_name = "PartType" + str(partType)
+        self.groupName = "PartType" + str(partType)
         self.coordinates = np.array(coordinates).astype(float)
         self.verbose = verbose
         self.silent = silent
@@ -140,11 +140,9 @@ class ReadRegion:
 
         # If input coordinates are in astro units, need to convert to code
         if astro:
-            conv_astro = st.get_conv_astro(fileName,
-                                           self.pt_name + '/Coordinates')
+            conv_astro = self.get_astro_conv('Coordinates')
             self.coordinates /= conv_astro
-            
-            
+                        
         # Do the actual work of finding segments to be loaded
         self._setup_region(mapFile, joinThreshold, bridgeThreshold, bridgeGap)
 
@@ -227,7 +225,7 @@ class ReadRegion:
         if fileName is None:
             fileName = self.fileName
         if pt_name is None:
-            pt_name = self.pt_name
+            pt_name = self.groupName
         if exact is None:
             exact = self.exact
         if silent is None:
@@ -500,14 +498,6 @@ class ReadRegion:
                     
         if self.exact:
             self._find_exact_region(self)
-
-    def _swap_file_name(self, baseName, number):
-        """Convenience function to update base filename"""
-
-        nameParts = baseName.split('.')
-        nameParts[-2] = str(number)
-        resName = '.'.join(nameParts)
-        return resName
     
     def _find_exact_region(self):
         """Find particles lying exactly in the selection region"""
@@ -648,7 +638,7 @@ class ReadRegion:
             return [0,0,0], [0,0,0]
 
         # Get the key numbers from the particle map file
-        ptGroup = f[self.pt_name]
+        ptGroup = f[self.groupName]
         cellCorner = ptGroup.attrs["CellRegionCorner"][:]
         cellSize = ptGroup.attrs["CellSize"][0]
         numCellsPerDim = ptGroup.attrs["NumCellsPerDim"][:]
@@ -731,7 +721,7 @@ class ReadRegion:
         """
 
         # Load the map data
-        ptGroup = f[self.pt_name]
+        ptGroup = f[self.groupName]
         numCellsPerDim = ptGroup.attrs["NumCellsPerDim"]
         numCellsTot = ptGroup.attrs["NumCellsTot"][0]
         if self.verbose:
