@@ -4,8 +4,9 @@ import os
 from pdb import set_trace
 import hydrangea.hdf5 as hd
 import hydrangea.tools as ht
+import time
 
-class SplitFile:
+class SplitFile(ReaderBase):
     """Class to read data sets that are split over multiple files.
 
     Attributes
@@ -79,19 +80,15 @@ class SplitFile:
             print("I don't know how many files to read...")
             set_trace()
         
-        # Set up output array if needed
-        if setup_before_read:
-            data_out = self._setup_output(dataSetName)
-        else:
-            data_out = None
-
         # Read individual files
         if self.numElem is not None:
-            for ifile in range(self.numFiles):
-                self._read_file(ifile, dataSetName, data_out)
+            if self.fileOffsets is not None:
+                data_out = self._read_files_direct(dataSetName)
+            else:
+                data_out = self._read_files_sequentially(dataSetName)
         else:
             # Use HAC if we don't know how many elements to read in total
-            self._read_files_hac(dataSetName, data_out)
+            data_out = self._read_files_hac(dataSetName)
                 
         # Apply corrections if needed
         if astro or return_conv:
@@ -125,28 +122,156 @@ class SplitFile:
             self.fileName, 'Header', 'ExpansionFactor', require=True)
         return ht.aexp_to_time(timeType)
 
-    def get_astro_conv(self, dataSetName):
-        """Retrieve the conversion factor to 'astronomical' units 
-        for a specified data set.
+    def _read_files_direct(self, dataSetName, verbose=True):
+        """Read data set from files using pre-established offset list."""
 
-        Note
-        ----
-        Returns None if this is an inconvertible quantity (e.g. IDs).
-        """
-        return ht.get_astro_conv(self.fileName, dataSetName)
+        data_out = None
+        for ifile in range(self.numFiles):
+            num_exp = self.fileOffsets[ifile+1] - self.fileOffsets[file]
+            if num_exp > 0:
+                num_read = self._read_file(ifile, dataSetName, data_out,
+                                           offset=self.fileOffsets[ifile],
+                                           verbose=verbose)
+                if (num_read != num_exp):
+                    print("Read {:d} elements, but expected {:d}!"
+                          .format(num_read, num_exp))
+        return data_out
+                    
+    def _read_files_sequentially(self, dataSetName, verbose=True):
+        """Read data from files in sequential order."""
 
-    def _setup_output(self, dataSetName):
-        """Set up the output array for specified data set."""
-        pass
+        data_out = None
+        offset = 0
+        for ifile in range(self.numFiles):
+            num_read = self._read_file(ifile, dataSetName, data_out,
+                                       offset=offset, verbose=verbose)
+            offset += num_read
 
-    def _read_file(self, ifile, dataSetName, data_out):
-        """Read a specified data set from a specified file into output."""
-        pass
+        # Make sure we read right total number
+        if offset != self.numElem:
+            print("Read wrong number of elements for '{:s}'."
+                  .format(dataSetName))
+            set_trace()
 
-    def _read_files_hac(self, dataSetName, data_out):
+        return data_out
+            
+    def _read_files_hac(self, dataSetName, threshold=int(1e9)):
         """Read data set from files into output, using HAC."""
-        pass
+
+        data_out = None
+        data_part = None
         
+        for ifile in range(self.numFiles):
+            self._read_file(ifile, dataSetName, data_part, self_only=True)
+
+            # Initialize output and stack, or append part to stack
+            if data_out is None:
+                data_out = np.copy(data_part)
+                data_stack = np.copy(data_part)
+            else:
+                data_stack = np.concatenate((data_stack, data_part))
+                
+            # Combine to full list if critical size reached:
+            if len(data_stack) > threshold:
+                print("Update full list...")
+                data_out = np.concatenate((data_out, data_stack))
+                emptyShape = list(data_stack.shape)
+                emptyShape[0] = 0
+                data_stack = np.empty(emptyShape, data_stack.dtype)
+
+        # Need to do final concatenation after loop ends
+        if len(data_stack):
+            data_out = np.concatenate((data_out, data_stack))
+                    
+        return data_out
+
+    def _read_file(self, ifile, dataSetName, data_out, offset=0,
+                   verbose=True, readRange=None, num_out=None,
+                   self_only=False):
+        """Read specified data set from one file into output.
+
+        This is the low-level reading routine called by the three 
+        'driver' functions _read_files_... above.
+
+        Parameters
+        ----------
+        ifile : int
+            The index of the file to read.
+        dataSetName : str
+            The name of the data set to read, including possibly containing
+            groups but *not* the main base group (e.g. 'PartType0').
+        data_out : np.array or None
+            The output array. If None, it is initialized internally.
+        offset : int, optional
+            The offset into the output array to write the data to. 
+            Default is 0, i.e. fill output array from its beginning.
+        verbose : bool, optional
+            Print progress messages.
+        readRange : int [start, end] or None, optional
+            The range of the data to read. If None (default), read all.
+            THIS IS STILL EXPERIMENTAL AND NOT PROPERLY IMPLEMENTED.
+        numOut : int or None, optional
+            The number of elements to allocate in the output array, if
+            it is initialized internally. If None (default), use self.numElem.
+        self_only : bool, optional
+            If output is internally initialized, only allocate enough
+            elements for data from this file (default: False).
+
+        Returns
+        -------
+        length : int
+            The number of elements that were read.
+        """
+
+        if verbose:
+            print(str(ifile)+" ", end = "",flush=True)
+            
+        # Form current file name and check it exists
+        fileName = self._swap_file_name(self.fileName, ifile)
+        if not os.path.isfile(fileName):
+            print("\nError: did not find expected file {:d}."
+                  .format(ifile), flush=True)
+            set_trace()
+
+        f = h5.File(fileName, 'r')
+        dsName = self.groupName + '/' + dataSetName
+
+        if readRange is not None:
+            length = readRange[1] - readRange[0]
+                        
+        # Not all files contain all groups, so need to check explicitly
+        try:
+            dataSet = f[dsName]
+        except:
+            if verbose:
+                print("No data found on file {:d}!" .format(ifile))
+            return 0
+
+        if data_out is None:
+            if offset > 0:
+                print("Warning: initializing output although offset is {:d}."
+                      .format(offset))
+            shape = list(dataSet.shape)   # Need to modify, so must be list
+
+            if readRange is None:
+                length = shape[0]
+                
+            if not self_only:
+                if numOut is None:
+                    shape[0] = self.numElem
+                else:
+                    shape[0] = numOut
+            data_out = np.empty(shape, dataSet.dtype)
+            dataSet.read_direct(data_out,
+                                dest_sel=np.s_[offset:offset+length])
+        else:
+            if readRange is None:
+                length = dataset.len()
+            dataSet.read_direct(data_out,
+                                dest_sel=np.s_[offset:offset+length])
+
+        return length
+    
     def _decode_ptype(self, ptype):
         """Identify supplied particle type"""
         
