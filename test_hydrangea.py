@@ -44,6 +44,6 @@ def test_crossref():
     else:
         set_trace()
     
-if __name__ == "main":
+if __name__ == "__main__":
     test_crossref()
     
