@@ -4,6 +4,7 @@ import os
 from pdb import set_trace
 import hydrangea.hdf5 as hd
 import hydrangea.tools as ht
+from hydrangea.reader_base import ReaderBase
 import time
 
 class SplitFile(ReaderBase):

@@ -13,6 +13,7 @@ import astropy.units as u
 import hydrangea.crossref as hxr
 import hydrangea.hdf5 as hdf5
 from hydrangea.split_file import SplitFile
+from hydrangea.reader_base import ReaderBase
 
 # TEMPORARY IMPORTS OF OLD PACKAGES
 import sim_tools as st # --> get_conv_astro, eagleread 
