@@ -131,7 +131,7 @@ class Gate:
             self.ie_int = query_array(revIDs, idsExt)
             self.ie_matched = np.nonzero(self.ie_int >= 0)[0]
 
-            self.nInt = np.max(revIDs)
+            self.nInt = np.max(revIDs)+1
             
     def in_int(self, index=None):
         """
@@ -183,7 +183,7 @@ class Gate:
 
         ii_ext = np.zeros(self.nInt, dtype = int)-1
         ii_matched = self.ie_int[self.ie_matched]
-        ii_ext[ii_matched] = np.arange(len(ii_matched))
+        ii_ext[ii_matched] = self.ie_matched
         
         if index is None:
             return ii_ext, ii_matched
@@ -286,7 +286,8 @@ def create_reverse_list(ids, delete_ids=False, assume_positive=False,
     return revList
 
 def find_id_indices(idsExt, idsInt, max_direct = 1e10, min_c = 1e5,
-                    sort_below=None, force_sort=False, verbose=False):
+                    sort_below=None, force_sort=False, sort_matches=True,
+                    verbose=False):
     """
     Find and return the locations of IDs in a reference list.
 
@@ -318,6 +319,10 @@ def find_id_indices(idsExt, idsInt, max_direct = 1e10, min_c = 1e5,
     force_sort : bool, optional
         Force a sorted search irrespective of maximum input values. This 
         is equivalent to, but slightly faster than, setting max_direct=0.
+    sort_matches : bool, optional
+        Explicitly sort matching indices from Katamaran-search in ascending 
+        order, so that its result is identical to direct method
+        (default: True).
     verbose : bool, optional
         Print timing information; default: False
 
@@ -352,7 +357,7 @@ def find_id_indices(idsExt, idsInt, max_direct = 1e10, min_c = 1e5,
 
     if use_direct:
         # Quick and simple way via reverse ID list:
-        revIDs = create_reverse_list(idsInt, maxVal = maxID_ext)
+        revIDs = create_reverse_list(idsInt, maxVal = np.max(idsExt))
         ie_int = revIDs[idsExt]
         ie_matched = np.nonzero(ie_int >= 0)[0]
 
@@ -367,20 +372,24 @@ def find_id_indices(idsExt, idsInt, max_direct = 1e10, min_c = 1e5,
 
         if max(len(idsExt), len(idsInt)) > min_c:
             # Long input list(s): use C version of Katamaran
-            ind_in_sorted_int = cKatamaran_search(idsExt[sorterExt],
-                                                  idsInt[sorterInt])
+            ise_sortedInt = cKatamaran_search(idsExt[sorterExt],
+                                              idsInt[sorterInt])
         else:
             # Short input lists: use python version of Katamaran
-            ind_in_sorted_int = katamaran_search(idsExt[sorterExt],
-                                                 idsInt[sorterInt])
+            ise_sortedInt = katamaran_search(idsExt[sorterExt],
+                                             idsInt[sorterInt])
 
-            # Result is the matches of ext in int:
-            subind_found = np.nonzero(ind_in_sorted_int >= 0)[0]
-            ie_matched = sorterExt[subind_found]
-            ie_int = np.zeros(len(idsExt), dtype = int)-1
-            ie_int[ie_matched] = sorterInt[
-                ind_in_sorted_int[subind_found]]
+        # Convert to matches of (unsorted) ext in (unsorted) int
+        ise_matched = np.nonzero(ise_sortedInt >= 0)[0]
+        ie_matched = sorterExt[ise_matched]  
+        ie_int = np.zeros(len(idsExt), dtype = int)-1
+        ie_int[ie_matched] = sorterInt[ise_sortedInt[ise_matched]]
 
+        # If desired, sort matches (only at the end, to not break
+        # alignment between ie_matched and ise_matched!)
+        if sort_matches:
+            ie_matched = np.sort(ie_matched)
+            
         if verbose:
             tKat = time.time()-tStart
             print("Sorting took    {:.3f} sec." .format(tSort))
