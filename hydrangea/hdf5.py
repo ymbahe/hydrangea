@@ -323,7 +323,7 @@ def read_data(fileName, container, range=None, require=False):
     """
 
     try:
-        f = h5.File(file, 'r')
+        f = h5.File(fileName, 'r')
         dSet = f[container]
         dType = f[container].dtype
         dShape = f[container].shape
