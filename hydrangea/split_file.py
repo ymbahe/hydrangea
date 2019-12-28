@@ -49,8 +49,8 @@ class SplitFile(ReaderBase):
             print("Prepared reading from '{:s}'..."
                   .format(self.groupName.upper()))
 
-    def read(self, dataSetName, verbose=False, astro=True,
-                 return_conv=False):
+    def read_data(self, dataSetName, verbose=False, astro=True,
+                  return_conv=False):
         """Read a specified data set from the file collection.
         
         Parameters
