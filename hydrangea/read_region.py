@@ -71,8 +71,8 @@ class ReadRegion(ReaderBase):
         specified target shape is performed. If False (default), all particles
         in the pre-selection region are flagged for loading.
     astro : bool, optional
-        If True, the supplied coordinates are interpreted as being in proper
-        Mpc instead of code units (cMpc/h). Default: False.
+        Interpret the supplied coordinates in proper Mpc instead of code 
+        units (cMpc/h). Default: True.
     map_file : string, optional
         Specifies the location of the particle map file. If None (default),
         this file is assumed to be in the same directory as the particle data.
@@ -96,7 +96,7 @@ class ReadRegion(ReaderBase):
 
     def __init__(self, fileName, partType, coordinates, shape=None,
                  anchor=None, verbose=False, silent=False, exact=False,
-                 astro=False, mapFile=None, periodic=False, load_full=False,
+                 astro=True, mapFile=None, periodic=False, load_full=False,
                  joinThreshold=100, bridgeThreshold=100, bridgeGap=0.1):
 
         stime = time.clock()
@@ -104,7 +104,7 @@ class ReadRegion(ReaderBase):
         # Store 'simple' parameters in internal variables
         self.fileName = fileName
         self.pt_num = partType
-        self.groupName = "PartType" + str(partType)
+        self.baseGroup = "PartType" + str(partType)
         self.coordinates = np.array(coordinates).astype(float)
         self.verbose = verbose
         self.silent = silent
@@ -170,7 +170,7 @@ class ReadRegion(ReaderBase):
         
     # -----------------------------------------------------------------------
         
-    def read_data(self, dataSetName, astro=False, verbose=None,
+    def read_data(self, dataSetName, astro=True, verbose=None,
                   return_conv=False, exact=None, fileName=None,
                   pt_name=None, singleFile=False, silent=None):
         """
@@ -184,8 +184,7 @@ class ReadRegion(ReaderBase):
             The leading 'PartType[x]' must however *not* be included!
 
         astro : bool, optional 
-            If True, convert values to proper astronomical units
-            (default: False)
+            Convert values to proper astronomical units (default: True)
         verbose : bool, optional 
             Enable additional log messages (default: class init value)
         return_conv : bool, optional 
@@ -226,7 +225,7 @@ class ReadRegion(ReaderBase):
         if fileName is None:
             fileName = self.fileName
         if pt_name is None:
-            pt_name = self.groupName
+            pt_name = self.baseGroup
         if exact is None:
             exact = self.exact
         if silent is None:
@@ -639,7 +638,7 @@ class ReadRegion(ReaderBase):
             return [0,0,0], [0,0,0]
 
         # Get the key numbers from the particle map file
-        ptGroup = f[self.groupName]
+        ptGroup = f[self.baseGroup]
         cellCorner = ptGroup.attrs["CellRegionCorner"][:]
         cellSize = ptGroup.attrs["CellSize"][0]
         numCellsPerDim = ptGroup.attrs["NumCellsPerDim"][:]
@@ -722,7 +721,7 @@ class ReadRegion(ReaderBase):
         """
 
         # Load the map data
-        ptGroup = f[self.groupName]
+        ptGroup = f[self.baseGroup]
         numCellsPerDim = ptGroup.attrs["NumCellsPerDim"]
         numCellsTot = ptGroup.attrs["NumCellsTot"][0]
         if self.verbose:
