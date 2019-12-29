@@ -3,9 +3,14 @@ Test suite to verify correct working of hydrangea utilities.
 """
 
 import hydrangea as hy
+import hydrangea.hdf5 as hd
 import hydrangea.crossref as xr
 import numpy as np
 from pdb import set_trace
+import sim_tools as st
+
+rundir = '/virgo/simulations/Hydrangea/10r200/CE-11/HYDRO/'
+isnap = 22
 
 def test_crossref():
     """Test cross-referencing modules"""
@@ -106,7 +111,37 @@ def test_crossref():
     else:
         set_trace()
 
+        
+def test_read_region():
+    snapdir = st.form_files(rundir, isnap, 'snap')
+    posloc = rundir + '/highlev/GalaxyPositionsSnap.hdf5'
+    galpos = hd.read_data(posloc, 'Centre', range=[299, 300])[0, isnap, :]
+    if galpos is None:
+        set_trace()
+    
+    readReg = hy.ReadRegion(snapdir, 0, [*galpos, 1.0],
+                            verbose=True)
+    gpos = readReg.read_data('Coordinates')
+    gids = readReg.read_data('ParticleIDs')
 
+    if 382253443 in gids:
+        print('Passed')
+    else:
+        set_trace()
+    
+    grad = np.linalg.norm(gpos-galpos[None, :], axis = 1)
+    ind_sphere = np.nonzero(grad <= 1.0)[0]
+
+    gpos_full = st.eagleread(snapdir, 'PartType0/Coordinates', astro = True)[0]
+    gids_full = st.eagleread(snapdir, 'PartType0/ParticleIDs', astro = False)
+    grad_full = np.linalg.norm(gpos_full - galpos[None, :], axis = 1)
+    ind_sphere_full = np.nonzero(grad_full <= 1.0)[0]
+
+    print("N_rr = {:d}, N_full = {:d}"
+          .format(len(ind_sphere), len(ind_sphere_full)))
+
+    check_equal(np.sort(gids[ind_sphere]), np.sort(gids_full[ind_sphere_full]))
+    
 def check_equal(arr1, arr2):
     if np.all(np.equal(arr1, arr2)):
         print("Passed")
@@ -114,5 +149,5 @@ def check_equal(arr1, arr2):
         set_trace()
         
 if __name__ == "__main__":
-    test_crossref()
+    test_read_region()
     
