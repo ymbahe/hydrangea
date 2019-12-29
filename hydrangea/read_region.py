@@ -97,7 +97,7 @@ class ReadRegion(ReaderBase):
     def __init__(self, fileName, partType, coordinates, shape=None,
                  anchor=None, verbose=False, silent=False, exact=False,
                  astro=True, mapFile=None, periodic=False, load_full=False,
-                 joinThreshold=100, bridgeThreshold=100, bridgeGap=0.1):
+                 joinThreshold=100, bridgeThreshold=100, bridgeGap=0.5):
 
         stime = time.clock()
 
