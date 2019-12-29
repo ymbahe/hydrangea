@@ -316,7 +316,7 @@ class ReadRegion(ReaderBase):
         for iiseg in range(self.numSegments):
             if verbose:
                 print("Segment {:d}, file {:d}"
-                      .format(iiseg, self.files[iiseg]))
+                      .format(iiseg, self.files[iiseg]), end="")
 
             if not singleFile:
                 unique_index = rev_files[self.files[iiseg]]
@@ -338,7 +338,9 @@ class ReadRegion(ReaderBase):
             readOffset = self.offsets[iiseg]
             readEnd = self.offsets[iiseg] + self.lengths[iiseg]
             writeEnd = writeOffset + self.lengths[iiseg]
-
+            if verbose:
+                print(" [{:d} --> {:d}]" .format(readOffset, readEnd))
+            
             # If we read from a single file, but the (main) particle data
             # are split, need to adjust location to read from in this file
             if singleFile:
@@ -732,6 +734,9 @@ class ReadRegion(ReaderBase):
         partCounts  = self._read_hdf5_direct(ptGroup, "CellCount", numCellsTot)
         partOffsets = self._read_hdf5_direct(ptGroup, "CellOffset", numCellsTot)
         fileOffsets = ptGroup["FileOffset"][:]
+        if self.verbose:
+            print("fileOffsets=", fileOffsets)
+            
         cellFiles = np.searchsorted(fileOffsets, partOffsets, side='right')-1
         numFiles = len(fileOffsets)-1
         
@@ -822,9 +827,9 @@ class ReadRegion(ReaderBase):
                         # the cell extends beyond the end of the file
                         if lastElem >= fileOffsets[cellFile + 1]:
                             lengthInFile = (fileOffsets[cellFile + 1]
-                                            - fileOffsets[cellFile])
+                                            - fileOffsets[cellFile] + 1)
                         else:
-                            lengthInFile = lastElem - fileOffsets[cellFile]
+                            lengthInFile = lastElem - fileOffsets[cellFile] + 1
 
                         files[nSegments] = cellFile
                         offsets[nSegments] = 0   # Always the case here!
