@@ -232,6 +232,11 @@ class ReadRegion(ReaderBase):
             silent = self.silent
         if verbose is None:
             verbose = self.verbose
+
+        if exact and not self.exact:
+            print("Exact region loading not enabled for this instance. "
+                  "Ignoring request for exact particle loading.")
+            exact = False
             
         # Deal with special case of loading the full particle catalogue 
         if self.load_full:
@@ -388,7 +393,7 @@ class ReadRegion(ReaderBase):
     # `````````````````` End of read_data() ''''''''''''''''''''''''''''
 
     def total_in_region(self, dataSetName, average=False,
-                        weightQuant = None, astro = False):
+                        weightQuant=None, astro=False):
         """
         Convenience function to compute the total or average of 'quantity' 
 
@@ -499,44 +504,45 @@ class ReadRegion(ReaderBase):
         self.numParticlesExact = self.numParticles
                     
         if self.exact:
-            self._find_exact_region(self)
+            self._find_exact_region()
     
     def _find_exact_region(self):
         """Find particles lying exactly in the selection region"""
-            
+
         # Need to explicitly set 'exact = False' here, because we have not 
         # yet set up exact loading (we are doing it right now!)
-        pt_coords = self.read_data("Coordinates", exact = False)
+        pt_coords = self.read_data("Coordinates", exact=False, astro=False)
 
         anchor = self.coordinates[:3]
-        relpos = coords - anchor[None, :]  
+        relPos = pt_coords - anchor[None, :]  
 
         if self.shape == 'sphere':
-            relrad = np.linalg.norm(relpos, axis=1)
-            self.ind_sel = np.nonzero(relrad <= self.coordinates[3])[0]
+            relRad = np.linalg.norm(relPos, axis=1)
+            self.ind_sel = np.nonzero(relRad <= self.coordinates[3])[0]
         elif self.shape == 'cube':
             if self.anchor == 'bottom':
                 self.ind_sel = np.nonzero(
-                    (np.min(relpos, axis = 1) >= 0) &
-                    (np.max(relpos, axis = 1) <= self.coordinates[3]))[0]
+                    (np.min(relPos, axis = 1) >= 0) &
+                    (np.max(relPos, axis = 1) <= self.coordinates[3]))[0]
             else:
                 self.ind_sel = np.nonzero(
-                    np.max(np.abs(relpos), axis = 1) <= self.coordinates[3])[0]
+                    np.max(np.abs(relPos), axis = 1) <= self.coordinates[3])[0]
                     
         elif self.shape == 'box':
             length = self.coordinates[3:]
             if self.anchor == 'bottom':
                 self.ind_sel = np.nonzero(
-                    (np.min(relpos, axis = 1) >= 0) &
-                    (np.max(relpos - length[None, :]) <= 0))[0]
+                    (np.min(relPos, axis = 1) >= 0) &
+                    (np.max(relPos - length[None, :]) <= 0))[0]
             else:
+                set_trace()
                 self.ind_sel = np.nonzero(
-                    np.max(np.abs(relpos - length[None, :])) <= 0)[0]
+                    np.max(np.abs(relPos - length[None, :])) <= 0)[0]
         else:
             print("Invalid shape encountered: '{:s}'." .format(self.shape))
             set_trace()
             
-        self.numParticlesExact = len(ind_sel)        
+        self.numParticlesExact = len(self.ind_sel)        
         
     def _make_selection_box(self):
         """
