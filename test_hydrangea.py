@@ -111,37 +111,83 @@ def test_crossref():
     else:
         set_trace()
 
-        
+def test_form_files():
+    snapdir, subdir = hy.form_files(rundir, isnap, 'snap sub')
+    magdir = hy.form_files(rundir, isnap, 'partmag')
+    print("Please check following names:")
+    print(snapdir, subdir, magdir)
+    set_trace()
+    
 def test_read_region():
-    snapdir = st.form_files(rundir, isnap, 'snap')
+    snapdir = hy.form_files(rundir, isnap, 'snap')
     posloc = rundir + '/highlev/GalaxyPositionsSnap.hdf5'
-    galpos = hd.read_data(posloc, 'Centre', range=[299, 300])[0, isnap, :]
+    galpos = hd.read_data(posloc, 'Centre', range = (299, 300))[0, isnap, :]
     if galpos is None:
         set_trace()
     
-    readReg = hy.ReadRegion(snapdir, 0, [*galpos, 1.0],
-                            verbose=True)
+    gpos_full = st.eagleread(snapdir, 'PartType0/Coordinates', astro = True)[0]
+    gids_full = st.eagleread(snapdir, 'PartType0/ParticleIDs', astro = False)
+    gmass_full = st.eagleread(snapdir, 'PartType0/Mass', astro = True)[0]
+
+    # TEST SPHERE #
+    readReg = hy.ReadRegion(snapdir, 0, [*galpos-1.0, 2.0], shape='Sphere',
+                            verbose=True, exact=True)
     gpos = readReg.read_data('Coordinates')
     gids = readReg.read_data('ParticleIDs')
-
-    if 382253443 in gids:
-        print('Passed')
-    else:
-        set_trace()
-    
     grad = np.linalg.norm(gpos-galpos[None, :], axis = 1)
     ind_sphere = np.nonzero(grad <= 1.0)[0]
 
-    gpos_full = st.eagleread(snapdir, 'PartType0/Coordinates', astro = True)[0]
-    gids_full = st.eagleread(snapdir, 'PartType0/ParticleIDs', astro = False)
+    if len(ind_sphere) == len(grad):
+        print("Passed")
+    else:
+        set_trace()
+
+    mtot = readReg.total_in_region('Mass')
+
     grad_full = np.linalg.norm(gpos_full - galpos[None, :], axis = 1)
     ind_sphere_full = np.nonzero(grad_full <= 1.0)[0]
+    if len(ind_sphere_full) == len(ind_sphere):
+        print("Passed")
+    else:
+        set_trace()
 
-    print("N_rr = {:d}, N_full = {:d}"
-          .format(len(ind_sphere), len(ind_sphere_full)))
+    if np.sum(gmass_full[ind_sphere_full]) == mtot:
+        print("Passed")
+    else:
+        set_trace()
 
-    check_equal(np.sort(gids[ind_sphere]), np.sort(gids_full[ind_sphere_full]))
+    gv = readReg.total_in_region('Velocity', weightQuant='Mass', astro=True)
+
+    gvel = readReg.read_data('Velocity', astro=True)
+    gmass = readReg.read_data('Mass', astro=True)
+    gv_check = np.sum(gvel*gmass[:, np.newaxis], axis = 0)/np.sum(gmass)
+    check_equal(gv, gv_check)
     
+
+    # TEST BOX #
+    readReg = hy.ReadRegion(snapdir, 0, [*galpos-1.0, 2.0, 2.0, 2.0],
+                            shape='Box', anchor='bottom',
+                            verbose=True, exact=True)
+    gpos = readReg.read_data('Coordinates')
+    gids = readReg.read_data('ParticleIDs')
+    grelpos = gpos - galpos[None, :]
+    ind_box = np.nonzero(np.max(np.abs(grelpos), axis = 1) <= 1.0)[0]
+
+    if len(ind_box) == len(grelpos):
+        print("Passed")
+    else:
+        set_trace()
+
+    mtot = readReg.total_in_region('Mass')
+
+    ind_box_full = np.nonzero((np.abs(gpos_full[:, 0]-galpos[0]) <= 1.0) &
+                              (np.abs(gpos_full[:, 1]-galpos[1]) <= 1.0) &
+                              (np.abs(gpos_full[:, 2]-galpos[2]) <= 1.0))[0]
+    print("N_rr = {:d}, N_full = {:d}"
+          .format(len(gids), len(ind_sphere_full)))
+    check_equal(np.sort(gids), np.sort(gids_full[ind_box_full]))
+
+
 def check_equal(arr1, arr2):
     if np.all(np.equal(arr1, arr2)):
         print("Passed")
