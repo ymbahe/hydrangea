@@ -1,6 +1,7 @@
-# Blank file
-
 import os
+import h5py as h5
+import numpy as np
+
 from pdb import set_trace
 import hydrangea.hdf5 as hd
 import hydrangea.tools as ht
@@ -23,9 +24,32 @@ class SplitFile(ReaderBase):
         Number of files in the collection (None if not determined).
     """
         
-    def __init__(self, fileName, groupName=None, ptype=None, verbose=False,
-                 simType='Eagle'):
-                
+    def __init__(self, file_name, group_name=None, part_type=None,
+                 sim_type='Eagle', verbose=False):
+
+        """Initialize a file collection to read from.
+
+        Parameters
+        ----------
+        file_name : str
+            Any one of the files in the collection to read.
+        group_name : str, optional
+            Name of base group to read from. If not provided, it is 
+            assumed to be 'PartType[x]', where x is the particle type
+            (which must then be supplied).
+        part_type : int, optional
+            The (numerical) particle type; only relevant for sn[a/i]pshots.
+            If not provided, it is inferred from group_name, which must 
+            then be supplied.
+        sim_type : str, optional
+            Type of simulation to which this data belongs:
+            'Eagle' (default) or 'Illustris'.
+        verbose : bool, optional
+            Provide extended output (default: False).
+        """
+
+        self.verbose = verbose
+        
         # First: check if the file exists...!
         if not os.path.isfile(fileName):
             print("-----------------------------------------------------")
@@ -43,19 +67,22 @@ class SplitFile(ReaderBase):
   
         # Find the total number of elements in the output array
         self._count_elements()         # Stored in self.numElem
-        self._count_files(simType)     # Stored in self.numFiles
-                
+        self._count_files(sim_type)     # Stored in self.numFiles
+        
         if verbose:
             print("Prepared reading from '{:s}'..."
                   .format(self.groupName.upper()))
 
-    def read_data(self, dataSetName, verbose=False, astro=True,
+        # For now, don't build offset list
+        self.fileOffsets = None
+            
+    def read_data(self, dataset_name, verbose=False, astro=True,
                   return_conv=False):
         """Read a specified data set from the file collection.
         
         Parameters
         ----------
-        dataSetName : str
+        dataset_name : str
             The name of the data set to read, including possibly containing
             groups, but *not* the main group specified in the instantiation.
         astro : bool
@@ -84,16 +111,16 @@ class SplitFile(ReaderBase):
         # Read individual files
         if self.numElem is not None:
             if self.fileOffsets is not None:
-                data_out = self._read_files_direct(dataSetName)
+                data_out = self._read_files_direct(dataset_name)
             else:
-                data_out = self._read_files_sequentially(dataSetName)
+                data_out = self._read_files_sequentially(dataset_name)
         else:
             # Use HAC if we don't know how many elements to read in total
-            data_out = self._read_files_hac(dataSetName)
+            data_out = self._read_files_hac(dataset_name)
                 
         # Apply corrections if needed
         if astro or return_conv:
-            astro_conv = self.get_astro_conv(dataSetName)
+            astro_conv = self.get_astro_conv(dataset_name)
             if astro and astro_conv is not None:
                 data_out *= astro_conv
 
@@ -121,7 +148,7 @@ class SplitFile(ReaderBase):
         """
         aExp = hd.read_attribute(
             self.fileName, 'Header', 'ExpansionFactor', require=True)
-        return ht.aexp_to_time(timeType)
+        return ht.aexp_to_time(aExp, timeType)
 
     def _read_files_direct(self, dataSetName, verbose=True):
         """Read data set from files using pre-established offset list."""
@@ -130,12 +157,13 @@ class SplitFile(ReaderBase):
         for ifile in range(self.numFiles):
             num_exp = self.fileOffsets[ifile+1] - self.fileOffsets[file]
             if num_exp > 0:
-                num_read = self._read_file(ifile, dataSetName, data_out,
-                                           offset=self.fileOffsets[ifile],
-                                           verbose=verbose)
+                num_read, data_out = self._read_file(
+                    ifile, dataSetName, data_out,
+                    offset=self.fileOffsets[ifile], verbose=verbose)
                 if (num_read != num_exp):
                     print("Read {:d} elements, but expected {:d}!"
                           .format(num_read, num_exp))
+        print("")
         return data_out
                     
     def _read_files_sequentially(self, dataSetName, verbose=True):
@@ -143,9 +171,11 @@ class SplitFile(ReaderBase):
 
         data_out = None
         offset = 0
+
         for ifile in range(self.numFiles):
-            num_read = self._read_file(ifile, dataSetName, data_out,
-                                       offset=offset, verbose=verbose)
+            num_read, data_out = self._read_file(
+                ifile, dataSetName, data_out, offset=offset,
+                verbose=verbose)
             offset += num_read
 
         # Make sure we read right total number
@@ -154,6 +184,7 @@ class SplitFile(ReaderBase):
                   .format(dataSetName))
             set_trace()
 
+        print("")
         return data_out
             
     def _read_files_hac(self, dataSetName, threshold=int(1e9)):
@@ -163,7 +194,8 @@ class SplitFile(ReaderBase):
         data_part = None
         
         for ifile in range(self.numFiles):
-            self._read_file(ifile, dataSetName, data_part, self_only=True)
+            num, data_part = self._read_file(ifile, dataSetName, None,
+                                             self_only=True)
 
             # Initialize output and stack, or append part to stack
             if data_out is None:
@@ -180,6 +212,7 @@ class SplitFile(ReaderBase):
                 emptyShape[0] = 0
                 data_stack = np.empty(emptyShape, data_stack.dtype)
 
+        print("")
         # Need to do final concatenation after loop ends
         if len(data_stack):
             data_out = np.concatenate((data_out, data_stack))
@@ -187,7 +220,7 @@ class SplitFile(ReaderBase):
         return data_out
 
     def _read_file(self, ifile, dataSetName, data_out, offset=0,
-                   verbose=True, readRange=None, num_out=None,
+                   verbose=True, readRange=None, numOut=None,
                    self_only=False):
         """Read specified data set from one file into output.
 
@@ -222,6 +255,8 @@ class SplitFile(ReaderBase):
         -------
         length : int
             The number of elements that were read.
+        data_out : np.array or None
+            The updated (or newly initialized) output array.
         """
 
         if verbose:
@@ -246,7 +281,7 @@ class SplitFile(ReaderBase):
         except:
             if verbose:
                 print("No data found on file {:d}!" .format(ifile))
-            return 0
+            return 0, data_out
 
         if data_out is None:
             if offset > 0:
@@ -267,15 +302,15 @@ class SplitFile(ReaderBase):
                                 dest_sel=np.s_[offset:offset+length])
         else:
             if readRange is None:
-                length = dataset.len()
+                length = dataSet.len()
             dataSet.read_direct(data_out,
                                 dest_sel=np.s_[offset:offset+length])
 
-        return length
+        return length, data_out
     
     def _decode_ptype(self, ptype):
         """Identify supplied particle type"""
-        
+
         if isinstance(ptype, int):
             self.groupName = 'PartType{:d}' .format(ptype)
         elif isinstance(ptype, str):
@@ -304,7 +339,7 @@ class SplitFile(ReaderBase):
             return
                 
         # Break file name into base and running sequence number
-        realFileName = os.path.split(fileName)[1]
+        realFileName = os.path.split(self.fileName)[1]
         fileNameParts = realFileName.split('_')
 
         if self.groupName[:8] == 'PartType':
@@ -315,7 +350,7 @@ class SplitFile(ReaderBase):
         # Deal with particle catalogue files
         if (fileNameParts[0] in ['snap', 'snip', 'partMags',
                                  'eagle_subfind_particles']):
-            if verbose: print("Particle catalogue detected!")
+            if self.verbose: print("Particle catalogue detected!")
 
             # Need to extract particle index to count (mag --> stars!)
             if self.groupName[:8] == 'PartType':
@@ -328,7 +363,7 @@ class SplitFile(ReaderBase):
         # Deal with subfind catalogue files
         elif len(fileNameParts) >= 2:
             if "_".join(fileNameParts[:3]) == 'eagle_subfind_tab':
-                if verbose: print("Subfind catalogue detected!")
+                if self.verbose: print("Subfind catalogue detected!")
                 if groupName == 'FOF':
                     self._count_elements_sf_fof()
                 elif groupName == 'Subhalo':
@@ -347,8 +382,8 @@ class SplitFile(ReaderBase):
         # (it does happen somewhere...)
         if self.numElem  < 0:
             self.numElem += 4294967296  
-        if verbose: print("   ... (detected {:d} elements) ..."
-                          .format(self.numElem), flush=True)
+        if self.verbose: print("   ... (detected {:d} elements) ..."
+                               .format(self.numElem), flush=True)
     
     def _count_elements_snap(self, pt_index):
         """Count number of particles of specified (int) type."""
