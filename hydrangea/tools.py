@@ -2,9 +2,11 @@
 
 from astropy.io import ascii
 from astropy.cosmology import Planck13
+import astropy.units as u
 import numpy as np
 import os
 from pdb import set_trace
+import glob
 
 def get_snepshot_indices(rundir, list='basic'):
     """
@@ -151,3 +153,113 @@ def get_astro_conv(fileName, dataSetName):
     
     conv_astro = aexp**ascale_exponent * h_hubble**hscale_exponent
     return conv_astro
+
+
+def form_files(simDir, index, types='sub', snepType='snap'):
+    """Create the file names for different output types and snapshots.
+
+    This is a convenience function to avoid having to manually construct
+    the HDF5 file names. Works for both Hydrangea and other Eagle simulations.
+
+    Parameters
+    ----------
+    simDir : string
+        The simulation base directory.
+    index : int
+        The snap- or snipshot index for which to create file names.
+    types : string or list of strings, optional
+        The type(s) of output for which to construct file names. Can be 
+        one or more of the following (separate by space if multiple):
+            'sub'     --> Subfind subhalo catalogue (default)
+            'snap'    --> Raw snapshot
+            'fof'     --> Subfind FOF catalogue
+            'subpart' --> Subfind particle catalogue
+            'partmag' --> Magnitudes of star particles (Hydrangea only) 
+    snepType : string, optional
+        Snepshot type to construct file(s) for: 'snap[shot]' (default)
+        or 'snip[shot]' (both short and long forms accepted, capitalization
+        ignored).
+
+    Returns
+    -------
+    file(s) : string or None (or list thereof)
+        Name(s) of the *first* HDF5 file of the desired output(s). If 
+        multiple types are specified, the filenames are in the same order 
+        as the input. None is returned for file names that could not be found.
+    """
+
+    # Consistency checks on input parameters:
+    sType = snepType.lower()[:4]
+    if sType not in ['snip', 'snap']:
+        print("Invalid snepType '{:s}'!" .format(snepType))
+        set_trace()
+        
+    # Split possibly multiple type inputs into list
+    typesList = types.split()
+    filesList = [] 
+    zString = None
+    
+    # Snapshot index as a triple-zero-padded string:
+    indexString = '{:03d}' .format(index)
+
+    # Translate each type into a directory and file prefix:
+    for itype in typesList:
+        if itype.lower() == 'snap':
+            if sType == 'snap':
+                names = ('snapshot', 'snap')
+            else:
+                names = ('snipshot', 'snip')
+
+        elif itype.lower() == 'sub':
+            names = ('groups', 'eagle_subfind_tab')
+        elif itype.lower() == 'subpart':
+            names = ('particledata', 'eagle_subfind_particles')
+        elif itype.lower() == 'fof':
+            names = ('groups', 'group_tab')
+        elif itype.lower() == 'partmag':
+            names = ('snapshot', 'partMags_EMILES_PDXX_DUST_CH')
+            if sType != 'snap':
+                raise Exception("Stellar magnitudes only available for "
+                                "snapshots.")
+        else:
+            raise Exception("Data type '" + itype + "' is not understood."
+                            "Please try another one.")
+
+        if zString is None:
+            zString = _find_zString(simDir, names[0], indexString)
+            if zString is None:
+                print("Error determining z-string...")
+                set_trace()
+        
+        # Build appropriate file name (different for magnitudes):
+        if itype == 'partmag':
+            ifile = ("{:s}/data/stars_extra/{:s}_{:s}_{:s}/"
+                     "{:s}_{:s}_{:s}.0.hdf5"
+                     .format(simDir,
+                             names[0], indexString, zString,
+                             names[1], indexString, zString))
+        else:
+            ifile = ("{:s}/data/{:s}_{:s}_{:s}/{:s}_{:s}_{:s}.0.hdf5"
+                     .format(simDir,
+                             names[0], indexString, zString,
+                             names[1], indexString, zString))
+
+        filesList.append(ifile)
+
+    # If input is single string, output should be too
+    if len(typesList) == 1:
+        filesList = filesList[0]
+
+    return filesList
+
+
+def _find_zString(simDir, dirType, indexString):
+    """Determine the redshift string for a particular output"""
+
+    sdir = glob.glob(simDir + 'data/' + dirType + '_' + indexString + '_*')
+    if len(sdir):
+        dirName = (sdir[0].split('/'))[-1]
+        zString = (dirName.split('_'))[-1]
+        return zString
+    else:
+        return None
