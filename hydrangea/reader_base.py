@@ -11,12 +11,12 @@ class ReaderBase:
     cross-matching of particle IDs to subhalo catalogues.
     """
 
-    def get_astro_conv(self, dataSetName):
+    def get_astro_conv(self, dataset_name):
         """Get the conversion factor to astronomical units for a data set.
 
         Parameters
         ----------
-        dataSetName : str
+        dataset_name : str
             The data set for which to compute the conversion factor.
 
         Returns
@@ -26,8 +26,8 @@ class ReaderBase:
         """
 
         try:
-            f = h5.File(self.fileName, 'r')
-            dSet = f[self.baseGroup + '/' + dataSetName]
+            f = h5.File(self.file_name, 'r')
+            dSet = f[self.base_group + '/' + dataset_name]
             
             hscale_exponent = dSet.attrs["h-scale-exponent"]
             ascale_exponent = dSet.attrs["aexp-scale-exponent"]
@@ -43,13 +43,13 @@ class ReaderBase:
         conv_astro = aexp**ascale_exponent * h_hubble**hscale_exponent
         return conv_astro
 
-    def _swap_file_name(self, baseName, number):
+    def _swap_file_name(self, base_name, number):
         """Convenience function to update base filename"""
 
-        nameParts = baseName.split('.')
-        nameParts[-2] = str(number)
-        resName = '.'.join(nameParts)
-        return resName
+        name_parts = base_name.split('.')
+        name_parts[-2] = str(number)
+        new_name = '.'.join(name_parts)
+        return new_name
     
     def find_subhalo(self, ids=None, return_matched=False):
         """On-the-fly retrieval of particle subhalo indices, found by
@@ -73,9 +73,10 @@ class ReaderBase:
         Note
         ----
         This is a convenience function to emulate a (non-existing) 
-        'subhalo index' data set in sn(a/i)pshot catalogues. Depending on
+        'subhalo index' data set in snapshot catalogues. Depending on
         circumstances, other approaches may be faster.
+        
+        This functionality is not yet implemented.
         """
-
         pass
         
