@@ -4,6 +4,7 @@ Convenience routines for reading and writing data in HDF5 format
 
 import h5py as h5
 import numpy as np
+from pdb import set_trace
 
 def check_attribute(fileName, container, attribute):
     """
@@ -138,7 +139,7 @@ def write_attribute(fileName, container, attName, value,
             os.rename(fileName, fileName+'.old')
 
     # Open file for creation or modification
-    f = h5.File(filename, 'a')
+    f = h5.File(fileName, 'a')
 
     # Create appropriate container if it does not yet exist
     if container not in f.keys():
@@ -148,7 +149,7 @@ def write_attribute(fileName, container, attName, value,
             f.create_dataset(container)
 
     # Modify existing attribute, or create new one if it does not yet exist
-    if att_name in f[container].attrs.keys():
+    if attName in f[container].attrs.keys():
         if update:
             f[container].attrs.modify(attName, value)
         else:
@@ -277,10 +278,9 @@ def read_attribute(fileName, container, attName,
         The attribute value read from the HDF5 file.
 
     """
-
     try:
-        f = h5.File(filename, 'r')
-        att = f[container].attrs[att_name]
+        f = h5.File(fileName, 'r')
+        att = f[container].attrs[attName]
         f.close()
     except:
         if not require:
@@ -332,7 +332,7 @@ def read_data(fileName, container, range=None, require=False):
         # Work out portion of data set to read
         if range is None:
             first = 0
-            stop = 0
+            stop = dSize
         else:
             first = range[0]
             stop = range[1]
