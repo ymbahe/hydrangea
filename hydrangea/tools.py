@@ -1,14 +1,19 @@
-# Blank file
+"""A collection of relatively simple routines for Hydrangea analysis."""
+
+import glob
+import h5py as h5
+import numpy as np
+import os
 
 from astropy.io import ascii
 from astropy.cosmology import Planck13
 import astropy.units as u
-import numpy as np
-import os
-from pdb import set_trace
-import glob
+from scipy.interpolate import interp1d
 
-def get_snepshot_indices(rundir, list='basic'):
+from pdb import set_trace
+
+
+def get_snepshot_indices(rundir, snep_list='basic'):
     """
     Extract type, number, and aexp for snepshots from a specified list.
 
@@ -16,47 +21,47 @@ def get_snepshot_indices(rundir, list='basic'):
     ----------
     rundir : str
         The base directory of the simulation.
-    list : str, optional
-        The snepshot list to extract (default: 'basic')
+    snep_list : str, optional
+        The snepshot list to extract, without extension (default: 'basic')
 
     Returns
     -------
-    rootIndex : np.array(int)
+    root_index : np.array(int)
         The root indices of all snepshots in specified list.
-    aExp : np.array(float):
+    aexp : np.array(float):
         The expansion factor of all snepshots in specified list.
-    sourceType : np.array(string)
+    source_type : np.array(string)
         For each snepshot, whether it is a 'snap' or 'snip'.
-    sourceNum : np.array(int)
+    source_num : np.array(int)
         Indices of snepshot in its category (i.e. snap/snipshot).
     """
-    
     snepdir = rundir + '/sneplists/'
-    fileName = snepdir + list + '.dat'
+    file_name = snepdir + snep_list + '.dat'
 
-    data = ascii.read(fileName)
-    
-    rootIndex = np.array(data['rootIndex'])
-    aExp = np.array(data['aexp'])
-    sourceType = np.array(data['sourceType'])
-    sourceNum = np.array(data['sourceNum'])
-    
-    return rootIndex, aexp, sourceType, sourceNum
-    
-def snep_times(timeType='aexp', list='allsnaps'):
+    data = ascii.read(file_name)
+
+    root_index = np.array(data['rootIndex'])
+    aexp = np.array(data['aexp'])
+    source_type = np.array(data['sourceType'])
+    source_num = np.array(data['sourceNum'])
+
+    return root_index, aexp, source_type, source_num
+
+
+def snep_times(time_type='aexp', snep_list='allsnaps'):
     """Return the times of all snepshots in a particular list.
 
     By default, the expansion factors of the 30 snapshots are returned.
 
     Parameters
     ----------
-    timeType : string
+    time_type : string
         Specified the 'time' flavour to be returned. Options are:
             'aexp' [default]: Expansion factor
             'zred': Redshift
             'age': Age of the Universe [Gyr]
             'lbt': Lookback time from z = 0 [Gyr]
-    list : string
+    snep_list : string
         The snepshot list for which to load times. Options are:
             'z0_only': 1 snapshot at z = 0
             'regsnaps': 28 regular snapshots
@@ -73,27 +78,25 @@ def snep_times(timeType='aexp', list='allsnaps'):
 
     Note
     ----
-    This function retrieves the target time of the snepshot, which may 
-    deviate slightly from the the actual output. Use read_snepshot_time() 
+    This function retrieves the target time of the snepshot, which may
+    deviate slightly from the the actual output. Use read_snepshot_time()
     for the latter.
-    
     """
+    curr_dir = os.path.dirname(os.path.realpath(__file__)) + "/"
+    snaptimes_file = curr_dir + 'OutputLists/' + snep_list + '.dat'
+    aexp = np.array(ascii.read(snaptimes_file, format='no_header')['col1'])
 
-    currDir = os.path.dirname(os.path.realpath(__file__)) + "/"
-    snaptimes_file = currDir + 'OutputLists/' + list + '.dat'
-    aExp = np.array(ascii.read(snaptimes_file, format = 'no_header')['col1'])
+    return aexp_to_time(aexp, time_type)
 
-    return aexp_to_time(aExp, timeType)
-    
 
-def aexp_to_time(aExp, timeType='age'):
-    """Convert expansion factor to other time stamps.
- 
+def aexp_to_time(aexp, time_type='age'):
+    """Convert expansion factor to another time flavour.
+
     Parameters
     ----------
-    aExp : float or np.array(float)
+    aexp : float or np.array(float)
         (Array of) expansion factors to convert.
-    timeType : string
+    time_type : string
         Specified the 'time' flavour to be returned. Options are:
             'aexp': Expansion factor
             'zred': Redshift
@@ -105,29 +108,47 @@ def aexp_to_time(aExp, timeType='age'):
     time : float or np.array(float)
         The desired time stamp corresponding to the input aExp(s).
 
+    Note
+    ----
+    Conversions to age and lookback time assume a Planck 13 cosmology.
+    For these, large input lists (> 1000 elements) are transformed via
+    an interpolation from a fine-spaced grid in aexp, for speed gains.
     """
-    
-    if timeType == 'aexp':
-        return aExp
-    elif timeType == 'zred':
-        return 1/aExp - 1
-    elif timeType == 'age':
-        return Planck13.age(1/aExp - 1).to(u.Gyr).value
-    elif timeType == 'lbt':
-        return Planck13.lookback_time(1/aExp - 1).to(u.Gyr).value
-    else:
-        print("I do not know what you mean by '" + timeType + "'...")
-        set_trace()
+    if time_type == 'aexp':
+        return aexp
+    if time_type == 'zred':
+        return 1/aexp - 1
 
-        
-def get_astro_conv(fileName, dataSetName):
+    if len(aexp) < 1000:
+        if time_type == 'age':
+            return Planck13.age(1/aexp - 1).to(u.Gyr).value
+        if time_type == 'lbt':
+            return Planck13.lookback_time(1/aexp - 1).to(u.Gyr).value
+    else:
+        aexps = np.linspace(aexp.min(), aexp.max(), 200)
+        times = np.zeros(200)
+
+        if time_type == 'age':
+            times = Planck13.age(1/aexps-1).to(u.Gyr).value
+        elif time_type == 'lbt':
+            times = Planck13.lookback_time(1/aexps - 1).to(u.Gyr).value
+        else:
+            print("I do not understand time_type '{:s}'!"
+                  .format(time_type))
+            set_trace()
+
+        csi_time = interp1d(aexps, times, kind='cubic')
+        return csi_time(aexp)
+
+
+def get_astro_conv(file_name, dataset_name):
     """Get the conversion factor to astronomical units for a data set.
 
     Parameters
     ----------
-    fileName : str
+    file_name : str
         The file containing the target data set.
-    dataSetName : str
+    dataset_name : str
         The data set for which to compute the conversion factor.
 
     Returns
@@ -135,27 +156,25 @@ def get_astro_conv(fileName, dataSetName):
     conv : float or None
         Conversion factor (None if it could not be determined).
     """
-
+    f = h5.File(file_name, 'r')
+    dSet = f[dataset_name]
     try:
-        f = h5.File(fileName, 'r')
-        dSet = f[dataSetName]
-        
         hscale_exponent = dSet.attrs["h-scale-exponent"]
         ascale_exponent = dSet.attrs["aexp-scale-exponent"]
-    
+
         header = f["/Header"]
         aexp = header.attrs["ExpansionFactor"]
         h_hubble = header.attrs["HubbleParam"]
+    except KeyError:
         f.close()
-
-    except:
         return None
-    
-    conv_astro = aexp**ascale_exponent * h_hubble**hscale_exponent
-    return conv_astro
+    f.close()
+
+    astro_conv = aexp**ascale_exponent * h_hubble**hscale_exponent
+    return astro_conv
 
 
-def form_files(simDir, index, types='sub', snepType='snap'):
+def form_files(sim_dir, index, types='sub', snep_type='snap'):
     """Create the file names for different output types and snapshots.
 
     This is a convenience function to avoid having to manually construct
@@ -163,19 +182,19 @@ def form_files(simDir, index, types='sub', snepType='snap'):
 
     Parameters
     ----------
-    simDir : string
+    sim_dir : string
         The simulation base directory.
     index : int
         The snap- or snipshot index for which to create file names.
     types : string or list of strings, optional
-        The type(s) of output for which to construct file names. Can be 
+        The type(s) of output for which to construct file names. Can be
         one or more of the following (separate by space if multiple):
             'sub'     --> Subfind subhalo catalogue (default)
             'snap'    --> Raw snapshot
             'fof'     --> Subfind FOF catalogue
             'subpart' --> Subfind particle catalogue
-            'partmag' --> Magnitudes of star particles (Hydrangea only) 
-    snepType : string, optional
+            'partmag' --> Magnitudes of star particles (Hydrangea only)
+    snep_type : string, optional
         Snepshot type to construct file(s) for: 'snap[shot]' (default)
         or 'snip[shot]' (both short and long forms accepted, capitalization
         ignored).
@@ -183,29 +202,28 @@ def form_files(simDir, index, types='sub', snepType='snap'):
     Returns
     -------
     file(s) : string or None (or list thereof)
-        Name(s) of the *first* HDF5 file of the desired output(s). If 
-        multiple types are specified, the filenames are in the same order 
+        Name(s) of the *first* HDF5 file of the desired output(s). If
+        multiple types are specified, the filenames are in the same order
         as the input. None is returned for file names that could not be found.
     """
-
     # Consistency checks on input parameters:
-    sType = snepType.lower()[:4]
-    if sType not in ['snip', 'snap']:
-        print("Invalid snepType '{:s}'!" .format(snepType))
+    s_type = snep_type.lower()[:4]
+    if s_type not in ['snip', 'snap']:
+        print("Invalid snep_type '{:s}'!" .format(snep_type))
         set_trace()
-        
+
     # Split possibly multiple type inputs into list
-    typesList = types.split()
-    filesList = [] 
-    zString = None
-    
+    types_list = types.split()
+    files_list = []
+    z_string = None
+
     # Snapshot index as a triple-zero-padded string:
-    indexString = '{:03d}' .format(index)
+    index_string = '{:03d}' .format(index)
 
     # Translate each type into a directory and file prefix:
-    for itype in typesList:
+    for itype in types_list:
         if itype.lower() == 'snap':
-            if sType == 'snap':
+            if s_type == 'snap':
                 names = ('snapshot', 'snap')
             else:
                 names = ('snipshot', 'snip')
@@ -218,48 +236,45 @@ def form_files(simDir, index, types='sub', snepType='snap'):
             names = ('groups', 'group_tab')
         elif itype.lower() == 'partmag':
             names = ('snapshot', 'partMags_EMILES_PDXX_DUST_CH')
-            if sType != 'snap':
+            if s_type != 'snap':
                 raise Exception("Stellar magnitudes only available for "
                                 "snapshots.")
         else:
             raise Exception("Data type '" + itype + "' is not understood."
                             "Please try another one.")
 
-        if zString is None:
-            zString = _find_zString(simDir, names[0], indexString)
-            if zString is None:
+        if z_string is None:
+            z_string = _find_z_string(sim_dir, names[0], index_string)
+            if z_string is None:
                 print("Error determining z-string...")
                 set_trace()
-        
+
         # Build appropriate file name (different for magnitudes):
         if itype == 'partmag':
-            ifile = ("{:s}/data/stars_extra/{:s}_{:s}_{:s}/"
-                     "{:s}_{:s}_{:s}.0.hdf5"
-                     .format(simDir,
-                             names[0], indexString, zString,
-                             names[1], indexString, zString))
+            ifile = ("{0:s}/data/stars_extra/{1:s}_{2:s}_{3:s}/"
+                     "{4:s}_{2:s}_{3:s}.0.hdf5"
+                     .format(sim_dir,
+                             names[0], index_string, z_string, names[1]))
         else:
-            ifile = ("{:s}/data/{:s}_{:s}_{:s}/{:s}_{:s}_{:s}.0.hdf5"
-                     .format(simDir,
-                             names[0], indexString, zString,
-                             names[1], indexString, zString))
+            ifile = ("{0:s}/data/{1:s}_{2:s}_{3:s}/{4:s}_{2:s}_{3:s}.0.hdf5"
+                     .format(sim_dir,
+                             names[0], index_string, z_string, names[1]))
 
-        filesList.append(ifile)
+        files_list.append(ifile)
 
     # If input is single string, output should be too
-    if len(typesList) == 1:
-        filesList = filesList[0]
+    if len(types_list) == 1:
+        files_list = files_list[0]
 
-    return filesList
+    return files_list
 
 
-def _find_zString(simDir, dirType, indexString):
-    """Determine the redshift string for a particular output"""
-
-    sdir = glob.glob(simDir + 'data/' + dirType + '_' + indexString + '_*')
-    if len(sdir):
-        dirName = (sdir[0].split('/'))[-1]
-        zString = (dirName.split('_'))[-1]
-        return zString
+def _find_z_string(sim_dir, dir_type, index_string):
+    """Determine the redshift string for a particular output."""
+    s_dir = glob.glob(sim_dir + 'data/' + dir_type + '_' + index_string + '_*')
+    if s_dir:
+        dir_name = (s_dir[0].split('/'))[-1]
+        z_string = (dir_name.split('_'))[-1]
+        return z_string
     else:
         return None
