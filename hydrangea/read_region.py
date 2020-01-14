@@ -502,6 +502,9 @@ class ReadRegion(ReaderBase):
         # all potentially relevant segments
         self._find_segments(cell_offsets, cell_lengths, f)
 
+        # Rule of thumb: close files...
+        f.close()
+
         # If there are many segments, try to combine them where possible
         if self.num_segments > join_threshold:
             self._join_segments()
@@ -699,7 +702,7 @@ class ReadRegion(ReaderBase):
 
         return cell_offsets, cell_lengths
 
-    def _find_segments(self, map_file, cell_offsets, cell_lengths):
+    def _find_segments(self, cell_offsets, cell_lengths, f):
         """
         Determine the 'segments' that have to be loaded.
 
@@ -708,12 +711,12 @@ class ReadRegion(ReaderBase):
 
         Parameters
         ----------
-        map_file : str
-            The name of the particle map file
         cell_offsets : array (int) [3]
             The first cell that intersects the selection box, per dimension.
         cell_lengths : array (int) [3]
             The number of cells intersecting the box, per dimension.
+        f : h5py File object
+            A handle to the previously opened map file.
 
         Stores in attribute
         -------------------
