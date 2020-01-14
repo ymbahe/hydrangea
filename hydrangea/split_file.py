@@ -16,14 +16,14 @@ class SplitFile(ReaderBase):
 
     Attributes
     ----------
-    fileName : str
+    file_name : str
         Name of one of the files in this split collection.
-    groupName : str or None
+    group_name : str or None
         Base group to read data from (None if not specified)
-    numElem : int or None
+    num_elem : int or None
         Number of elements in the selected group category (None if it
         could not be determined or is not applicable).
-    numFiles : int or None
+    num_files : int or None
         Number of files in the collection (None if not determined).
     """
 
