@@ -198,7 +198,7 @@ class ReadRegion(ReaderBase):
         verbose : bool, optional
             Enable additional log messages (default: class init value)
         return_conv : bool, optional
-            Return a list of [data, conv_astro, aexp], where conv_astro
+            Return a list of [data, conv_astro], where conv_astro
             is the conversion factor internal-->astro (default: False).
         exact : bool, optional
             Only return data for particles lying in the exact specified
@@ -223,9 +223,6 @@ class ReadRegion(ReaderBase):
         conv_astro : float
             Code-to-astronomical conversion factor; only returned if
             return_conv is True.
-        aexp : float
-            The expansion factor at the time of the particle output; only
-            returned if return_conv is True.
 
         Note
         ----
@@ -261,7 +258,7 @@ class ReadRegion(ReaderBase):
                     if astro and astro_conv is not None:
                         data_full *= astro_conv
                     if return_conv:
-                        return [data_full, astro_conv, self.aexp]
+                        return [data_full, astro_conv]
                     else:
                         return data_full
             else:
@@ -271,7 +268,7 @@ class ReadRegion(ReaderBase):
         # Deal with pathological case of no data to load:
         if self.num_segments == 0:
             if return_conv:
-                return [np.zeros(0, dtype=int), None, None]
+                return np.zeros(0, dtype=int), None
             else:
                 return np.zeros(0, dtype=int)
 
@@ -382,7 +379,7 @@ class ReadRegion(ReaderBase):
                   .format(dataset_name, time.time() - stime))
 
         if return_conv:
-            return data_full, astro_conv, self.aexp
+            return data_full, astro_conv
         else:
             return data_full
 
@@ -503,8 +500,7 @@ class ReadRegion(ReaderBase):
 
         # The heavy lifting: find file index, offset, and length for
         # all potentially relevant segments
-        self.files, self.offsets, self.lengths = self._find_segments(
-            cell_offsets, cell_lengths, f)
+        self._find_segments(cell_offsets, cell_lengths, f)
 
         # If there are many segments, try to combine them where possible
         if self.num_segments > join_threshold:
@@ -719,13 +715,15 @@ class ReadRegion(ReaderBase):
         cell_lengths : array (int) [3]
             The number of cells intersecting the box, per dimension.
 
-        Returns
-        -------
-        files : array (int) [N_segments]
+        Stores in attribute
+        -------------------
+        num_segments : int
+            The number of segments found in total.
+        files : array (int) [num_segments]
             The file index in which each segment is located.
-        offsets : array (int) [N_segments]
+        offsets : array (int) [num_segments]
             The segments' first particle in the respective file.
-        lengths : array (int) [N_segments]
+        lengths : array (int) [num_segments]
             The number of particles in each segment.
 
         Note
@@ -748,7 +746,6 @@ class ReadRegion(ReaderBase):
         self.file_offsets = ptGroup["FileOffset"][:]
         if self.verbose:
             print("file_offsets=", self.file_offsets)
-
         map_cell_files = np.searchsorted(self.file_offsets, map_offsets,
                                          side='right')-1
         self.num_files = len(self.file_offsets)-1
@@ -756,118 +753,100 @@ class ReadRegion(ReaderBase):
         # Set up output arrays (large enough to account for worst-case of
         # each file gap dividing a selected cell)
         max_segments = self.num_cells + self.num_files
-        files = np.zeros(max_segments, dtype=int)-1
-        offsets = np.zeros(max_segments, dtype=int)-1
-        lengths = np.zeros(max_segments, dtype=int)
+        self.files = np.zeros(max_segments, dtype=int)-1
+        self.offsets = np.zeros(max_segments, dtype=int)-1
+        self.lengths = np.zeros(max_segments, dtype=int)
 
         # Now loop through all possibly relevant cells...
         num_checked = 0
-        num_segments = 0
+        self.num_segments = 0
         for cz in range(cell_offsets[2], cell_offsets[2]+cell_lengths[2]):
             for cy in range(cell_offsets[1], cell_offsets[1]+cell_lengths[1]):
                 for cx in range(cell_offsets[0],
                                 cell_offsets[0]+cell_lengths[0]):
-                    # Deal with possibility of periodic wrapping
-                    # (assume entire box is mapped in this case!)
-                    cxx, cyy, czz = cx, cy, cz
-                    if self.periodic:
-                        if cxx < 0:
-                            cxx += map_cells_per_dim[0]
-                        elif cxx >= map_cells_per_dim[0]:
-                            cxx -= map_cells_per_dim[0]
-                        if cyy < 0:
-                            cyy += map_cells_per_dim[1]
-                        elif cyy >= map_cells_per_dim[1]:
-                            cyy -= map_cells_per_dim[1]
-                        if czz < 0:
-                            czz += map_cells_per_dim[2]
-                        elif czz >= map_cells_per_dim[2]:
-                            czz -= map_cells_per_dim[2]
-
-                    # Construct 1D index of cell we're working on
-                    index = (cxx + cyy*map_cells_per_dim[0]
-                             + czz*map_cells_per_dim[0]*map_cells_per_dim[1])
                     if (num_checked+1 % 10000 == 0) and not self.silent:
                         print("Checking cell {:d} (segments so far: {:d})"
-                              .format(num_checked, num_segments))
-                    num_checked += 1
-
-                    # Sanity check to make sure index is valid:
-                    if index < 0 or index >= map_cells:
-                        print("Problem: trying to access invalid cell index "
-                              "({:d}, map_cells = {:d}. Please investigate."
-                              .format(index, map_cells))
-                        set_trace()
-
-                    # Shortcut in case current cell is empty
-                    if map_counts[index] == 0:
-                        continue
-
-                    # Ok, if we get here there are some particles in the
-                    # current cell --> add to output list
-                    #
-                    # Need file index and file-offset of first cell particle
-                    cell_file = map_cell_files[index]
-                    offset_in_file = (map_offsets[index]
-                                      - self.file_offsets[cell_file])
-                    if offset_in_file >= self.file_offsets[cell_file + 1]:
-                        print("Inconsistent file offset detected...")
-                        set_trace()
-
-                    first_elem = map_offsets[index]
-                    last_elem = map_offsets[index] + map_counts[index] - 1
-
-                    # If this is a multi-file cell, truncate segment to end
-                    # of (current, first) file, and deal with it later
-                    if self.file_offsets[cell_file + 1] <= last_elem:
-                        length_in_file = (self.file_offsets[cell_file + 1]
-                                          - first_elem)
-                    else:
-                        length_in_file = map_counts[index]
-
-                    # Save current segment in next free place of arrays
-                    files[num_segments] = cell_file
-                    offsets[num_segments] = offset_in_file
-                    lengths[num_segments] = length_in_file
-                    num_segments += 1
-                    if num_segments > max_segments:
+                              .format(num_checked, self.num_segments))
+                        num_checked += 1
+                    index = _ind1d([cx, cy, cz], map_cells_per_dim, map_cells,
+                                   periodic=periodic)
+                    self._segmentise_cell(map_counts[index],
+                                          map_cell_files[index],
+                                          map_offsets[index])
+                    if self.num_segments > max_segments:
                         print("Have somehow created too many segments...")
                         set_trace()
 
-                    # Now create additional segments for following file(s)
-                    # if necessary:
-                    while self.file_offsets[cell_file + 1] <= last_elem:
-                        cell_file += 1
-
-                        # Number of elements depends on whether even now
-                        # the cell extends beyond the end of the file
-                        if last_elem >= self.file_offsets[cell_file + 1]:
-                            length_in_file = (self.file_offsets[cell_file + 1]
-                                              - self.file_offsets[cell_file])
-                        else:
-                            length_in_file = (last_elem
-                                              - self.file_offsets[cell_file]
-                                              + 1)
-
-                        files[num_segments] = cell_file
-                        offsets[num_segments] = 0   # Always the case here!
-                        lengths[num_segments] = length_in_file
-                        num_segments += 1
-                        if num_segments > max_segments:
-                            print("Have somehow created too many segments...")
-                            set_trace()
-
         # Final touches
-        self.num_segments = num_segments
-        files = files[:num_segments]
-        offsets = offsets[:num_segments]
-        lengths = lengths[:num_segments]
+        self.files = self.files[:self.num_segments]
+        self.offsets = self.offsets[:self.num_segments]
+        self.lengths = self.lengths[:self.num_segments]
 
         if self.verbose:
             print("Checked {:d} cells, found {:d} segments."
-                  .format(num_checked, num_segments))
+                  .format(num_checked, self.num_segments))
 
-        return files, offsets, lengths
+    def _segmentise_cell(self, cell_count, cell_file, cell_offset):
+        """Analyse one cell and add its segments to the internal arrays.
+
+        Parameters
+        ----------
+        cell_count : int
+            The number of particles in current cell.
+        cell_file : int
+            The file index of the first particle in the cell.
+        cell_offset : int
+            The offset in the full, concatenated particle list of the
+            first particle in this cell.
+        """
+        # Shortcut in case current cell is empty
+        if cell_count == 0:
+            return
+
+        # Ok, if we get here there *are* some particles in the
+        # current cell --> add to output list
+        #
+        # Need file index and file-offset of first cell particle
+        offset_in_file = (cell_offset
+                          - self.file_offsets[cell_file])
+        if offset_in_file >= self.file_offsets[cell_file + 1]:
+            print("Inconsistent file offset detected...")
+            set_trace()
+
+        first_elem = cell_offset
+        last_elem = cell_offset + cell_count - 1
+
+        # If this is a multi-file cell, truncate segment to end
+        # of (current, first) file, and deal with it later
+        if self.file_offsets[cell_file + 1] <= last_elem:
+            length_in_file = (self.file_offsets[cell_file + 1]
+                              - first_elem)
+        else:
+            length_in_file = cell_count
+
+        # Save current segment in next free place of arrays
+        self.files[self.num_segments] = cell_file
+        self.offsets[self.num_segments] = offset_in_file
+        self.lengths[self.num_segments] = length_in_file
+        self.num_segments += 1
+
+        # If needed, create additional segment(s) for following file(s)
+        while self.file_offsets[cell_file + 1] <= last_elem:
+            cell_file += 1
+
+            # Number of elements depends on whether even now
+            # the cell extends beyond the end of the file
+            if last_elem >= self.file_offsets[cell_file + 1]:
+                length_in_file = (self.file_offsets[cell_file + 1]
+                                  - self.file_offsets[cell_file])
+            else:
+                length_in_file = (last_elem
+                                  - self.file_offsets[cell_file] + 1)
+
+            self.files[self.num_segments] = cell_file
+            self.offsets[self.num_segments] = 0   # Always the case here!
+            self.lengths[self.num_segments] = length_in_file
+            self.num_segments += 1
 
     def _join_segments(self, gap_factor=None):
         """Combine adjoining or nearby segments to speed up reading.
@@ -970,6 +949,32 @@ class ReadRegion(ReaderBase):
 
 
 # ----------- Below are short private helper functions ----------------------
+
+def _ind1d(ind3d, num_3d, num_tot=None, periodic=False):
+    """Convert a 3D to 1D index."""
+    if num_tot is None:
+        num_tot = num_3d[0]*num_3d[1]*num_3d[2]
+    if periodic:
+        for idim in range(3):
+            ind3d[idim] = _periodic_wrap(ind3d[idim], num_3d[idim])
+
+    ind1d = (ind3d[0] + ind3d[1]*num_3d[0] + ind3d[2]*num_3d[0]*num_3d[1])
+    if ind1d < 0 or ind1d >= num_tot:
+        print("Invalid 1D index generated ({:d}, total={:d})."
+              "Please investigate."
+              .format(ind1d, num_tot))
+        set_trace()
+    return ind1d
+
+
+def _periodic_wrap(i, n):
+    """Perform (single) periodic wrapping of index i to length n."""
+    if i < 0:
+        i += n
+    elif i >= n:
+        i -= n
+    return i
+
 
 def _find_odd_elements(index, power=1):
     """Find elements in index that are odd to the i^th power."""
