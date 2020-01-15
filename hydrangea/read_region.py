@@ -51,7 +51,7 @@ class ReadRegion(ReaderBase):
     """
 
     def __init__(self, file_name, part_type, coordinates, shape=None,
-                 anchor=None, verbose=False, silent=False, exact=False,
+                 anchor=None, verbose=1, exact=False,
                  astro=True, map_file=None, periodic=False, load_full=False,
                  join_threshold=100, bridge_threshold=100, bridge_gap=0.5):
         """
@@ -85,10 +85,8 @@ class ReadRegion(ReaderBase):
             length(s) as full side length. If 'centre' or None (default), they
             specify the centre instead, as described above. This parameter
             has no effect when a sphere is selected as shape.
-        verbose : bool, optional
-            If True, more output is printed (default: False)
-        silent : bool, optional
-            If True, no output is printed (default: False)
+        verbose : int, optional
+            Frequency of log messages (default: 1==>few)
         exact : bool, optional
             Only load particles lying exactly within the specified region,
             at extra cost (internally reads particle positions). If False
@@ -116,7 +114,6 @@ class ReadRegion(ReaderBase):
         self.base_group = "PartType{:d}" .format(part_type)
         self.coordinates = np.array(coordinates, dtype=float)
         self.verbose = verbose
-        self.silent = silent
         self.exact = exact
         self.load_full = load_full
         self.periodic = periodic
@@ -140,8 +137,7 @@ class ReadRegion(ReaderBase):
         if map_file is None:
             map_file = os.path.dirname(file_name) + '/ParticleMap.hdf5'
         if not os.path.exists(map_file):
-            if not silent:
-                print("Could not find particle map -- load everything.")
+            self._print(1, "Could not find particle map -- load everything.")
             self.load_full = True
 
         # If we need to load everything, we can quit now
@@ -161,29 +157,26 @@ class ReadRegion(ReaderBase):
         if self.load_full:
             return
 
-        if not self.silent:
-            print("Region setup took {:.3f} sec."
-                  .format(time.clock()-stime))
-            print("Selection region contains {:d} cells, {:d} segments, "
-                  "{:d} particles, {:d} files"
-                  .format(self.num_cells, self.num_segments,
-                          self.num_particles, len(np.unique(self.files))))
-        if verbose:
-            print("  (selected files:", np.unique(self.files), ")")
+        self._print(1, "Region setup took {:.3f} sec."
+                    .format(time.clock()-stime))
+        self._print(1, "Selection region contains {:d} cells, {:d} segments, "
+                    "{:d} particles, {:d} files"
+                    .format(self.num_cells, self.num_segments,
+                            self.num_particles, len(np.unique(self.files))))
+        self._print(2, "  (selected files:", np.unique(self.files), ")")
 
         # If we'd have to load almost all particles, load everything
         if self.num_particles >= self.num_part_total * 0.75:
             self.load_full = True
-            if not self.silent:
-                print("Need to load {:.1f}% of total particle catalogue\n"
-                      "  ==> faster to load everything instead"
-                      .format(self.num_particles/self.num_part_total * 100))
+            self._print(1, "Need to load {:.1f}% of total particle catalogue\n"
+                        "  ==> faster to load everything instead"
+                        .format(self.num_particles/self.num_part_total * 100))
 
     # -----------------------------------------------------------------------
 
     def read_data(self, dataset_name, astro=True, verbose=None,
                   return_conv=False, exact=None, file_name=None,
-                  pt_name=None, single_file=False, silent=None):
+                  pt_name=None, single_file=False, store=False, trial=False):
         """
         Read a specified dataset for a previously set up region.
 
@@ -195,8 +188,8 @@ class ReadRegion(ReaderBase):
 
         astro : bool, optional
             Convert values to proper astronomical units (default: True)
-        verbose : bool, optional
-            Enable additional log messages (default: class init value)
+        verbose : int, optional
+            Frequency of log messages. If None (default), use class value.
         return_conv : bool, optional
             Return a list of [data, conv_astro], where conv_astro
             is the conversion factor internal-->astro (default: False).
@@ -213,8 +206,14 @@ class ReadRegion(ReaderBase):
         single_file : bool, optional
             Assume that data resides in a single file (default: False).
             This is used only for ancillary catalogues.
-        silent : bool, optional
-            Suppress all output (default: class init value).
+        store : str or None or False, optional
+            Store the retrieved array as an attribute with this name.
+            If None, the (full) name of the data set is used, with
+            '/' replaced by '__'. Default: False.
+        trial : bool, optional
+            Attempt to read the data set. If it does not yield the
+            expected number of elements for any one file or total,
+            return None. If False (default), enter debug mode in this case.
 
         Returns
         -------
@@ -238,13 +237,11 @@ class ReadRegion(ReaderBase):
             pt_name = self.base_group
         if exact is None:
             exact = self.exact
-        if silent is None:
-            silent = self.silent
         if verbose is None:
             verbose = self.verbose
         if exact and not self.exact:
-            print("Exact region loading not enabled for this instance. "
-                  "Ignoring request for exact particle loading.")
+            self._print(1, "Region not setup with exact loading. "
+                        "Ignoring request for exact particle loading.")
             exact = False
 
         full_dataset_name = pt_name + '/' + dataset_name
@@ -255,7 +252,7 @@ class ReadRegion(ReaderBase):
                 data_full = hdf5.read_data(file_name, full_dataset_name)
                 if astro or return_conv:
                     astro_conv = self.get_astro_conv(dataset_name)
-                    if astro and astro_conv is not None:
+                    if astro and astro_conv is not None and astro_conv != 1:
                         data_full *= astro_conv
                     if return_conv:
                         return [data_full, astro_conv]
@@ -294,7 +291,16 @@ class ReadRegion(ReaderBase):
             f = file_list[0]
 
         # Set up output before we iterate:
-        dSet = f[full_dataset_name]
+        try:
+            dSet = f[full_dataset_name]
+        except KeyError:
+            if trial:
+                if return_conv:
+                    return None, None
+                else:
+                    return None
+            print("Could not load data set, please investigate.")
+            set_trace()
         full_shape = list(dSet.shape)      # Cannot assign to tuple ==> list
         full_shape[0] = self.num_particles
         data_full = np.empty(full_shape, dSet.dtype)
@@ -303,16 +309,14 @@ class ReadRegion(ReaderBase):
         if astro or return_conv:
             astro_conv = self.get_astro_conv(dataset_name)
 
-        if verbose:
-            print("Pre-reading '{:s}' took {:.3f} sec."
-                  .format(dataset_name, time.time() - stime))
+        self._print((2, verbose), "Pre-reading '{:s}' took {:.3f} sec."
+                    .format(dataset_name, time.time() - stime))
 
         # Read individual segments into correct location of output array
         for iiseg in range(self.num_segments):
             ifile = self.files[iiseg]
-            if verbose:
-                print("Segment {:d}, file {:d}"
-                      .format(iiseg, ifile), end="")
+            self._print((2, verbose), "Segment {:d}, file {:d}"
+                        .format(iiseg, ifile), end="")
 
             if not single_file:
                 # Retrieve correct file handle
@@ -334,8 +338,8 @@ class ReadRegion(ReaderBase):
             read_offset = self.offsets[iiseg]
             read_end = self.offsets[iiseg] + self.lengths[iiseg]
             write_end = write_offset + self.lengths[iiseg]
-            if verbose:
-                print(" [{:d} --> {:d}]" .format(read_offset, read_end))
+            self._print((2, verbose), " [{:d} --> {:d}]"
+                        .format(read_offset, read_end))
 
             # If we read from a single file, but the (main) particle data
             # are split, need to adjust location to read from in this file
@@ -371,12 +375,17 @@ class ReadRegion(ReaderBase):
         if exact:
             data_full = data_full[self.ind_sel, ...]
 
-        if astro and astro_conv is not None:
+        if astro and astro_conv is not None and astro_conv != 1:
             data_full *= astro_conv
 
-        if not silent:
-            print("Reading '{:s}' took {:.3f} sec."
-                  .format(dataset_name, time.time() - stime))
+        # Store the array directly in the object, if desired
+        if store is not False:
+            if store is None:
+                store = dataset_name.replace('/', '__')
+            setattr(self, store, data_full)
+
+        self._print((1, verbose), "Reading '{:s}' took {:.3f} sec."
+                    .format(dataset_name, time.time() - stime))
 
         if return_conv:
             return data_full, astro_conv
@@ -469,12 +478,11 @@ class ReadRegion(ReaderBase):
         """
         # Select rectangular region of simulation to be loaded
         box = self._make_selection_box()
-        if self.verbose:
-            print("Selection box is ["
-                  "({:.3f} --> {:.3f}), "
-                  "({:.3f} --> {:.3f}), "
-                  "({:.3f} --> {:.3f})]"
-                  .format(*box[0, :], *box[1, :], *box[2, :]))
+        self._print(2, "Selection box is ["
+                    "({:.3f} --> {:.3f}), "
+                    "({:.3f} --> {:.3f}), "
+                    "({:.3f} --> {:.3f})]"
+                    .format(*box[0, :], *box[1, :], *box[2, :]))
 
         f = h5.File(map_file, 'r')
 
@@ -482,9 +490,8 @@ class ReadRegion(ReaderBase):
         #     'cell_offsets' is the first cell per dimension
         #     'num_cells' is the number of cells per dimension
         cell_offsets, cell_lengths = self._identify_relevant_cells(box, f)
-        self.num_cells = reduce(mul, cell_lengths, 1)
-        if not self.silent:
-            print("Checking {:d} cells..." .format(self.num_cells))
+        self.num_cells = reduce(mul, cell_lengths, 1)       
+        self._print(1, "Checking {:d} cells..." .format(self.num_cells))
 
         # No cells --> nothing to do --> done
         if self.num_cells == 0:
@@ -661,22 +668,21 @@ class ReadRegion(ReaderBase):
         num_cells_per_dim = ptGroup.attrs["NumCellsPerDim"][:]
         cell_top = cell_corner + cell_size*num_cells_per_dim
 
-        if self.verbose:
-            print("cell_corner =", cell_corner)
-            print("cell_size =", cell_size)
+        self._print(2, "cell_corner =", cell_corner)
+        self._print(2, "cell_size =", cell_size)
 
         # Sanity check to make sure the box does not go below/above
         # the mapped region (also upper/lower box corner!)
         if np.min(box[:, 0] - cell_corner) < 0:
-            if not self.silent:
-                print("Warning: selection box extends below mapped region.")
-                print("Clipping it to edge of the map...")
+            self._print(
+                1, "Warning: selection box extends below mapped region.\n"
+                "Clipping it to edge of the map...")
             box[:, 0] = np.clip(box[:, 0], cell_corner, None)
             box[:, 1] = np.clip(box[:, 1], cell_corner, None)
         if np.min(cell_top - box[:, 1]) < 0:
-            if not self.silent:
-                print("Warning: selection box extends above mapped region.\n"
-                      "Clipping it to edge of the map...")
+            self._print(
+                1, "Warning: selection box extends above mapped region.\n"
+                "Clipping it to edge of the map...")
             box[:, 0] = np.clip(box[:, 0], None, cell_top)
             box[:, 1] = np.clip(box[:, 1], None, cell_top)
 
@@ -696,10 +702,8 @@ class ReadRegion(ReaderBase):
         cell_ends = np.clip(cell_ends, None, num_cells_per_dim)
         cell_lengths = cell_ends - cell_offsets
 
-        if self.verbose:
-            print("cell_offsets =", cell_offsets)
-            print("cell_lengths =", cell_lengths)
-
+        self._print(2, "cell_offsets =", cell_offsets)
+        self._print(2, "cell_lengths =", cell_lengths)
         return cell_offsets, cell_lengths
 
     def _find_segments(self, cell_offsets, cell_lengths, f):
@@ -735,20 +739,17 @@ class ReadRegion(ReaderBase):
         start of the function. This may be inefficient for small cell numbers.
         """
         # Load the map data
-        f = h5.File(map_file, 'r')
         ptGroup = f[self.base_group]
         map_cells_per_dim = ptGroup.attrs["NumCellsPerDim"]
         map_cells = ptGroup.attrs["NumCellsTot"][0]
-        if self.verbose:
-            print("Cells per dimension in map:", map_cells_per_dim)
+        self._print(2, "Cells per dimension in map:", map_cells_per_dim)
 
         # To avoid confusion with the (overall) cellOffsets/-Counts,
         # call the 'particles-in-map-cells' counters 'mapOffsets/-Counts
         map_counts = _read_hdf5_direct(ptGroup, "CellCount", map_cells)
         map_offsets = _read_hdf5_direct(ptGroup, "CellOffset", map_cells)
         self.file_offsets = ptGroup["FileOffset"][:]
-        if self.verbose:
-            print("file_offsets=", self.file_offsets)
+        self._print(2, "file_offsets=", self.file_offsets)
         map_cell_files = np.searchsorted(self.file_offsets, map_offsets,
                                          side='right')-1
         self.num_files = len(self.file_offsets)-1
@@ -767,12 +768,13 @@ class ReadRegion(ReaderBase):
             for cy in range(cell_offsets[1], cell_offsets[1]+cell_lengths[1]):
                 for cx in range(cell_offsets[0],
                                 cell_offsets[0]+cell_lengths[0]):
-                    if (num_checked+1 % 10000 == 0) and not self.silent:
-                        print("Checking cell {:d} (segments so far: {:d})"
-                              .format(num_checked, self.num_segments))
-                        num_checked += 1
+                    if (num_checked+1 % 10000 == 0):
+                        self._print(
+                            1, "Checking cell {:d} (segments so far: {:d})"
+                            .format(num_checked, self.num_segments))
+                    num_checked += 1
                     index = _ind1d([cx, cy, cz], map_cells_per_dim, map_cells,
-                                   periodic=periodic)
+                                   periodic=self.periodic)
                     self._segmentise_cell(map_counts[index],
                                           map_cell_files[index],
                                           map_offsets[index])
@@ -785,9 +787,8 @@ class ReadRegion(ReaderBase):
         self.offsets = self.offsets[:self.num_segments]
         self.lengths = self.lengths[:self.num_segments]
 
-        if self.verbose:
-            print("Checked {:d} cells, found {:d} segments."
-                  .format(num_checked, self.num_segments))
+        self._print(2, "Checked {:d} cells, found {:d} segments."
+                    .format(num_checked, self.num_segments))
 
     def _segmentise_cell(self, cell_count, cell_file, cell_offset):
         """Analyse one cell and add its segments to the internal arrays.
@@ -892,9 +893,8 @@ class ReadRegion(ReaderBase):
             self.offsets[ind_join] -= len_extra
             self.lengths[ind_join] += len_extra
         num_joins = len(ind_join)
-        if not self.silent:
-            print("Identified {:d} joins for {:d} segments..."
-                  .format(num_joins, self.num_segments))
+        self._print(1, "Identified {:d} joins for {:d} segments..."
+                    .format(num_joins, self.num_segments))
 
         # Don't need to do anything if there's nothing to do
         if num_joins == 0:
@@ -915,8 +915,7 @@ class ReadRegion(ReaderBase):
         jj = 1
         while True:
             # Find segments eligible to join in this iteration
-            if self.verbose:
-                print("Join iteration {:d}..." .format(jj))
+            self._print(2, "Join iteration {:d}..." .format(jj))
             subind_join_now = _find_odd_elements(ind_join, jj)
 
             # Join eligible segments onto their predecessors
@@ -926,9 +925,8 @@ class ReadRegion(ReaderBase):
             num_joined += len(subind_join_now)
 
             # Check whether we have joined everything that can be
-            if self.verbose:
-                print("Have so far completed {:d} joins ({:.2f}%)..."
-                      .format(num_joined, num_joined/num_joins*100))
+            self._print(2, "Have so far completed {:d} joins ({:.2f}%)..."
+                        .format(num_joined, num_joined/num_joins*100))
             if num_joined == num_joins:
                 break
 
@@ -945,10 +943,9 @@ class ReadRegion(ReaderBase):
         self.files = self.files[ind_remain]
         self.offsets = self.offsets[ind_remain]
         self.lengths = self.lengths[ind_remain]
-        if self.verbose:
-            print("Retained {:d} segments ({:.2f}%...)"
-                  .format(self.num_segments,
-                          self.num_segments/len(sorter)*100))
+        self._print(1, "Retained {:d} segments ({:.2f}%...)"
+                    .format(self.num_segments,
+                            self.num_segments/len(sorter)*100))
 
 
 # ----------- Below are short private helper functions ----------------------
