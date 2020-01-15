@@ -28,7 +28,8 @@ class SplitFile(ReaderBase):
     """
 
     def __init__(self, file_name, group_name=None, part_type=None,
-                 sim_type='Eagle', verbose=False):
+                 sim_type='Eagle', verbose=1, astro=True, read_range=None,
+                 read_index=None):
         """Initialize a file collection to read from.
 
         Parameters
@@ -46,10 +47,38 @@ class SplitFile(ReaderBase):
         sim_type : str, optional
             Type of simulation to which this data belongs:
             'Eagle' (default) or 'Illustris'.
-        verbose : bool, optional
-            Provide extended output (default: False).
+        verbose : int, optional
+            Specify level of log output, from 0 (minimal) to 2 (lots).
+            Default: 1.
+        astro : bool, optional
+            Default conversion behaviour (default: True).
+        read_range : (int, int) or None, optional
+            Read only elements from the first up to *but excluding* the
+            second entry in the tuple. If None (default), load entire
+            catalogue. Ignored if read_index is provided.
+        read_index : int or np.array(int) or None, optional
+            Read only the elements in read_index. If int, a single
+            element is read, and the first dimension truncated. If
+            an array is provided, the elements between the lowest and
+            highest index are read and the output then masked to the
+            exact elements. If None (default), everything is read.
+
+        Note
+        ----
+        For proper functionality, read_range requires that the file
+        offsets be determined. If this is not possible, the entire
+        data set will be read and then truncated (slower).
+
         """
         self.verbose = verbose
+        self.astro = astro
+        self.read_index = read_index
+        if read_index is None:
+            self.read_range = read_range
+        elif isinstance(read_index, int):
+            self.read_range = [read_index, read_index+1]
+        else:
+            self.read_range = [np.min(read_index), np.max(read_index)+1]
 
         # First: check if the file exists...!
         if not os.path.isfile(file_name):
@@ -65,14 +94,13 @@ class SplitFile(ReaderBase):
         if part_type is not None:
             self._decode_ptype(part_type)
         else:
-            self.group_name = group_name
+            self.base_group = group_name
 
-        if verbose:
-            print("Prepared reading from '{:s}'..."
-                  .format(self.group_name.upper()))
+        self._print(1, "Prepared reading from '{:s}'..."
+                    .format(self.base_group.upper()))
 
-    def read_data(self, dataset_name, verbose=False, astro=True,
-                  return_conv=False):
+    def read_data(self, dataset_name, verbose=None, astro=None,
+                  return_conv=False, store=False, trial=False):
         """Read a specified data set from the file collection.
 
         Parameters
@@ -80,13 +108,22 @@ class SplitFile(ReaderBase):
         dataset_name : str
             The name of the data set to read, including possibly containing
             groups, but *not* the main group specified in the instantiation.
-        astro : bool
+        astro : bool or None, optional
             Attempt conversion to `astronomical' units where necessary
             (pMpc, 10^10 M_sun, km/s). This is ignored for dimensionless
             quantities. Default: True
-        verbose : bool
+        verbose : int, optional
             Provide more or less useful messages during reading.
-            Default: False
+            Default: 1 (minimal)
+        store : str or None or False, optional
+            Store the retrieved array as an attribute with this name.
+            If None, the (full) name of the data set is used, with
+            '/' replaced by '__'. Default: False.
+        trial : bool, optional
+            Attempt to read the data set. If it does not yield the
+            expected number of elements for any one file or total
+            (or returns any elements in HAC mode), return None.
+            If False (default), enter debug mode in this case.
 
         Returns
         -------
@@ -97,50 +134,91 @@ class SplitFile(ReaderBase):
             return_conv is True.
 
         """
+        if astro is None:
+            astro = self.astro
+        if verbose is None:
+            verbose = self.verbose
+
         # Check that setup has been done properly
         if self.num_files is None:
             print("I don't know how many files to read...")
             set_trace()
 
         # Read individual files
+        need_to_truncate = True   # Check for post-hoc truncation
         if self.num_elem is not None:
             if self.file_offsets is not None:
                 data_out = self._read_files_direct(dataset_name,
-                                                   verbose=verbose)
+                                                   verbose, trial)
+                need_to_truncate = False  # Done internally here
             else:
                 data_out = self._read_files_sequentially(dataset_name,
-                                                         verbose=verbose)
+                                                         verbose, trial)
         else:
             # Use HAC if we don't know how many elements to read in total
-            data_out = self._read_files_hac(dataset_name)
+            data_out = self._read_files_hac(dataset_name, trial,
+                                            verbose=verbose)
 
         # Apply corrections if needed
-        if astro or return_conv:
-            astro_conv = self.get_astro_conv(dataset_name)
-            if astro and astro_conv is not None:
-                data_out *= astro_conv
+        if data_out is not None:
+            if need_to_truncate and self.read_range is not None:
+                data_out = data_out[self.read_range[0] : self.read_range[1]]
+            if isinstance(self.read_index, int):
+                if data_out.ndim == 1:
+                    data_out = data_out[0]
+                else:
+                    data_out = data_out[0, ...]
+            elif self.read_index is not None:
+                ind_sel = self.read_index - self.read_range[0]
+                data_out = data_out[ind_sel, ...]
+            if astro or return_conv:
+                astro_conv = self.get_astro_conv(dataset_name)
+                if astro and astro_conv is not None and astro_conv != 1:
+                    data_out *= astro_conv
+
+        # Store the array directly in the object, if desired
+        if store is not False:
+            if store is None:
+                store = dataset_name.replace('/', '__')
+            setattr(self, store, data_out)
 
         if return_conv:
             return data_out, astro_conv
         else:
             return data_out
 
-    def _read_files_direct(self, dataset_name, verbose=True):
+    def _read_files_direct(self, dataset_name, verbose=1, trial=False):
         """Read data set from files using pre-established offset list."""
         data_out = None
-        for ifile in range(self.num_files):
-            num_exp = self.file_offsets[ifile+1] - self.file_offsets[ifile]
+        for ifile in range(self.read_start[0], self.read_end[0]+1):
+
+            # Find number of elements to read in this file
+            start = 0
+            end = self.file_offsets[ifile+1] - self.file_offsets[ifile]
+            if self.read_range is not None:
+                if ifile == self.read_start[0]:
+                    start = self.read_start[1]
+                if ifile == self.read_end[0]:
+                    end = self.read_end[1]
+            num_exp = end - start
+            write_offset = (start + self.file_offsets[ifile]
+                            - self.read_range[0])
+
             if num_exp > 0:
                 num_read, data_out = self._read_file(
-                    ifile, dataset_name, data_out,
-                    offset=self.file_offsets[ifile], verbose=verbose)
+                    ifile, dataset_name, data_out, read_range=[start, end],
+                    offset=write_offset, verbose=verbose)
                 if num_read != num_exp:
+                    if trial:
+                        return None
                     print("Read {:d} elements, but expected {:d}!"
                           .format(num_read, num_exp))
-        print("")
+                    set_trace()
+        self._print((1, verbose), "")  # Ends no-newline sequence
         return data_out
 
-    def _read_files_sequentially(self, dataset_name, verbose=True):
+    def _read_files_sequentially(self, dataset_name, verbose=1,
+                                 trial=False):
         """Read data from files in sequential order."""
         data_out = None
         offset = 0
@@ -153,21 +231,27 @@ class SplitFile(ReaderBase):
 
         # Make sure we read right total number
         if offset != self.num_elem:
+            if trial:
+                return None
             print("Read wrong number of elements for '{:s}'."
                   .format(dataset_name))
             set_trace()
 
-        print("")   # Ends no-newline sequence inside _read_file()
+        self._print((1, verbose), "")   # Ends no-newline sequence
         return data_out
 
-    def _read_files_hac(self, dataset_name, threshold=int(1e9)):
+    def _read_files_hac(self, dataset_name, trial=False, threshold=int(1e9),
+                        verbose=1):
         """Read data set from files into output, using HAC."""
         data_out = None
+        data_stack = None
         data_part = None
 
         for ifile in range(self.num_files):
             num, data_part = self._read_file(ifile, dataset_name, None,
-                                             self_only=True)
+                                             self_only=True, verbose=verbose)
+            if num == 0:
+                continue
 
             # Initialize output and stack, or append part to stack
             if data_out is None:
@@ -178,22 +262,25 @@ class SplitFile(ReaderBase):
 
             # Combine to full list if critical size reached:
             if len(data_stack) > threshold:
-                print("Update full list...")
+                self._print((1, verbose), "Update full list...")
                 data_out = np.concatenate((data_out, data_stack))
                 empty_shape = list(data_stack.shape)
                 empty_shape[0] = 0
                 data_stack = np.empty(empty_shape, data_stack.dtype)
 
-        print("")  # Ends no-newline sequence inside _read_file()
+        self._print((1, verbose), "")  # Ends no-newline sequence
 
         # Need to do final concatenation after loop ends
-        if data_stack:
+        if data_stack is not None and len(data_stack):
+            self._print((1, verbose), "Final concatenation...")
             data_out = np.concatenate((data_out, data_stack))
 
+        if trial and (data_out is None or len(data_out) == 0):
+            return None
         return data_out
 
     def _read_file(self, ifile, dataset_name, data_out, offset=0,
-                   verbose=True, read_range=None, num_out=None,
+                   verbose=1, read_range=None, num_out=None,
                    self_only=False):
         """Read specified data set from one file into output.
 
@@ -212,11 +299,10 @@ class SplitFile(ReaderBase):
         offset : int, optional
             The offset into the output array to write the data to.
             Default is 0, i.e. fill output array from its beginning.
-        verbose : bool, optional
-            Print progress messages.
+        verbose : int, optional
+            Print more or fewer progress messages.
         read_range : int [start, end] or None, optional
             The range of the data to read. If None (default), read all.
-            THIS IS STILL EXPERIMENTAL AND NOT PROPERLY IMPLEMENTED.
         num_out : int or None, optional
             The number of elements to allocate in the output array, if
             it is initialized internally. If None (default), use self.numElem.
@@ -231,8 +317,7 @@ class SplitFile(ReaderBase):
         data_out : np.array or None
             The updated (or newly initialized) output array.
         """
-        if verbose:
-            print(str(ifile) + " ", end="", flush=True)
+        self._print((1, verbose), str(ifile) + " ", end="", flush=True)
 
         # Form current file name and check it exists
         file_name = self._swap_file_name(self.file_name, ifile)
@@ -242,24 +327,28 @@ class SplitFile(ReaderBase):
             set_trace()
 
         f = h5.File(file_name, 'r')
-        full_dataset_name = self.group_name + '/' + dataset_name
+        full_dataset_name = self.base_group + '/' + dataset_name
 
         # Not all files contain all groups, so need to check explicitly
         try:
             dataSet = f[full_dataset_name]
         except KeyError:
-            if verbose:
-                print("No data found on file {:d}!" .format(ifile))
+            self._print((1, verbose), "No data found on file {:d}!"
+                        .format(ifile))
             return 0, data_out
 
         # With read range, length is pre-determined
         if read_range is not None:
             length = read_range[1] - read_range[0]
+            source_sel = np.s_[read_range[0]:read_range[1]]
+        else:
+            source_sel = None
 
         if data_out is None:
             if offset > 0:
-                print("Warning: initializing output although offset is {:d}."
-                      .format(offset))
+                self._print(
+                    (1, verbose), "Warning: initializing output although "
+                    "offset is {:d}." .format(offset))
             shape = list(dataSet.shape)   # Need to modify, so must be list
 
             if read_range is None:
@@ -271,30 +360,28 @@ class SplitFile(ReaderBase):
                 else:
                     shape[0] = num_out
             data_out = np.empty(shape, dataSet.dtype)
-            dataSet.read_direct(data_out,
-                                dest_sel=np.s_[offset:offset+length])
         else:
             if read_range is None:
                 length = dataSet.len()
-            dataSet.read_direct(data_out,
-                                dest_sel=np.s_[offset:offset+length])
+        dataSet.read_direct(data_out, source_sel,
+                            dest_sel=np.s_[offset:offset+length, ...])
 
         return length, data_out
 
     def _decode_ptype(self, ptype):
         """Identify supplied particle type."""
         if isinstance(ptype, int):
-            self.group_name = 'PartType{:d}' .format(ptype)
+            self.base_group = 'PartType{:d}' .format(ptype)
         elif isinstance(ptype, str):
             if ptype.upper() == 'GAS':
-                self.group_name = 'PartType0'
+                self.base_group = 'PartType0'
             elif ptype.upper() == 'DM':
-                self.group_name = 'PartType1'
+                self.base_group = 'PartType1'
             elif ptype.upper() in ['STARS', 'STAR']:
-                self.group_name = 'PartType4'
+                self.base_group = 'PartType4'
             elif ptype.upper() in ['BH', 'BHS', 'BLACKHOLE', 'BLACKHOLES',
                                    'BLACK_HOLES', 'BLACK_HOLE']:
-                self.group_name = 'PartType5'
+                self.base_group = 'PartType5'
             else:
                 print("Unrecognized particle type name '{:s}'"
                       .format(ptype))
@@ -305,33 +392,41 @@ class SplitFile(ReaderBase):
 
     @property
     def num_elem(self):
-        """Find out how many output elements there are in total."""
+        """Find out how many output elements there are in total.
+
+        Note that, with read_range set up, this is the total number
+        of elements in this range, not in the total catalogue.
+        """
         if '_num_elem' not in dir(self):
-            self._num_elem = self._count_elements()
+            self._print(2, "Load total number of elements...")
+            if self.read_range is None:
+                self._num_elem = self._count_elements()
+            else:
+                self._num_elem = self.read_range[1]-self.read_range[0]
         return self._num_elem
 
     def _count_elements(self, file=None):
         """Count number of elements to read."""
         num_elem = None   # Placeholder for "not known"
-        if self.group_name is None:
+        if self.base_group is None:
             return
 
         # Break file name into base and running sequence number
         real_file_name = os.path.split(self.file_name)[1]
         file_name_parts = real_file_name.split('_')
 
-        if self.group_name.startswith('PartType'):
-            pt_index = int(self.group_name[8])
+        if self.base_group.startswith('PartType'):
+            pt_index = int(self.base_group[8])
         else:
             pt_index = None   # For checking
 
         # Deal with particle catalogue files
         if (file_name_parts[0] in ['snap', 'snip', 'partMags',
                                    'eagle_subfind_particles']):
-            if self.verbose and file is None:
-                print("Particle catalogue detected!")
+            if file is None:
+                self._print(2, "   Particle catalogue detected... ", end="")
             # Need to extract particle index to count (mag --> stars!)
-            if self.group_name.startswith('PartType'):
+            if self.base_group.startswith('PartType'):
                 if file is None:
                     num_elem = self._count_elements_snap(pt_index)
                 else:
@@ -347,19 +442,19 @@ class SplitFile(ReaderBase):
         # Deal with subfind catalogue files
         elif len(file_name_parts) >= 2:
             if "_".join(file_name_parts[:3]) == 'eagle_subfind_tab':
-                if self.verbose and file is None:
-                    print("Subfind catalogue detected!")
-                if self.group_name == 'FOF':
+                if file is None:
+                    self._print(2, "   Subfind catalogue detected... ", end="")
+                if self.base_group == 'FOF':
                     if file is None:
                         num_elem = self._count_elements_sf_fof()
                     else:
                         num_elem = self._count_file_elements_sf_fof(file)
-                elif self.group_name == 'Subhalo':
+                elif self.base_group == 'Subhalo':
                     if file is None:
                         num_elem = self._count_elements_sf_subhalo()
                     else:
                         num_elem = self._count_file_elements_sf_subhalo(file)
-                elif self.group_name == 'IDs':
+                elif self.base_group == 'IDs':
                     if file is None:
                         num_elem = self._count_elements_sf_ids()
                     else:
@@ -376,9 +471,8 @@ class SplitFile(ReaderBase):
         # (it does happen somewhere...)
         if num_elem < 0:
             num_elem += 4294967296
-        if self.verbose:
-            print("   ... (detected {:d} elements) ..."
-                  .format(num_elem), flush=True)
+        if file is None:
+            self._print(2, "{:d} elements." .format(num_elem), flush=True)
         return num_elem
 
     def _count_elements_snap(self, pt_index):
@@ -427,8 +521,9 @@ class SplitFile(ReaderBase):
 
     @property
     def num_files(self):
-        """Count number of files to read."""
+        """Count number of files in the data set."""
         if '_num_files' not in dir(self):
+            self._print(2, "Loading file offsets...")
             if self.sim_type == 'Eagle':
                 self._num_files = hd.read_attribute(
                     self.file_name, 'Header', 'NumFilesPerSnapshot',
@@ -445,18 +540,23 @@ class SplitFile(ReaderBase):
     def file_offsets(self):
         """List offset of each file in total data set."""
         if '_file_offsets' not in dir(self):
+            start_time = time.time()
             pm_file_name = (os.path.dirname(self.file_name)
                             + '/ParticleMap.hdf5')
             if os.path.exists(pm_file_name):
+                self._print(2, "Loading file offsets from map...")
                 self._find_file_offsets_from_map(pm_file_name)
             else:
+                self._print(2, "Finding file offsets one-by-one.")
                 self._find_file_offsets()
+            self._print(1, "Loaded file offsets in {:.3f} sec."
+                        .format(time.time() - start_time))
         return self._file_offsets
 
     def _find_file_offsets_from_map(self, map_file_name):
         """Extract offsets of each file in total data set from map."""
-        self._file_offsets = hd.read_attribute(
-            map_file_name, self.group_name, 'FileOffset')
+        self._file_offsets = hd.read_data(
+            map_file_name, self.base_group + '/FileOffset')
 
     def _find_file_offsets(self):
         """Find file offsets sequentially from individual files."""
@@ -470,3 +570,40 @@ class SplitFile(ReaderBase):
                 return
 
             self._file_offsets[ifile+1] = self._file_offsets[ifile] + length
+
+    @property
+    def read_start(self):
+        """File and offset of first element to read."""
+        if '_read_start' not in dir(self):
+            if self.read_range is None:
+                self._read_start = (0, 0)
+            else:
+                self._read_start = self._locate_index(self.read_range[0])
+                self._print(2, "Read start: (file={:d}, offset={:d})"
+                            .format(*self._read_start))
+        return self._read_start
+
+    @property
+    def read_end(self):
+        """File and offset of last element to read."""
+        if '_read_end' not in dir(self):
+            if self.read_range is None:
+                self._read_end = (self.num_files-1, None)
+            else:
+                self._read_end = self._locate_index(self.read_range[1])
+                self._print(2, "Read end: (file={:d}, offset={:d})"
+                            .format(*self._read_end))
+        return self._read_end
+
+    def _locate_index(self, index):
+        """Locate the file and offset of a specified element."""
+        file = np.searchsorted(self.file_offsets, index, side='right') - 1
+        offset = index - self.file_offsets[file]
+        if file < 0:
+            self._print(1, "Truncating lower read end to 0 (was {:d})."
+                        .format(index))
+            file = offset = 0
+        if file >= self.num_files:
+            self._print(1, "Truncating upper read end to {:d} (was {:d})"
+                        .format(self.file_offsets[-1]))
+        return (file, offset)
