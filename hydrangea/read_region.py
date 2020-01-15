@@ -912,8 +912,9 @@ class ReadRegion(ReaderBase):
         # 3. --> 4, 12, 20, 28, ... [divisible by 4, but not 8]
         # ... and so forth.
         num_joined = 0
-        jj = 1
+        jj = 0
         while True:
+            jj += 1
             # Find segments eligible to join in this iteration
             self._print(2, "Join iteration {:d}..." .format(jj))
             subind_join_now = _find_odd_elements(ind_join, jj)
@@ -929,6 +930,9 @@ class ReadRegion(ReaderBase):
                         .format(num_joined, num_joined/num_joins*100))
             if num_joined == num_joins:
                 break
+
+            if num_joined > num_joins:
+                set_trace()
 
             # Update targets that have just joined for next iteration
             ind_target_joined = _find_odd_elements(ind_to_join, jj)
