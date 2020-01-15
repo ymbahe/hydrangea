@@ -64,7 +64,7 @@ class ReaderBase:
     def time(self):
         """Get the age of the Universe of the data set [Gyr]."""
         if '_age' not in dir(self):
-            self._age = ht.aexp_to_time(self.aexp, 'age')
+            self._time = ht.aexp_to_time(self.aexp, 'age')
         return self._time
 
     @property
@@ -99,6 +99,30 @@ class ReaderBase:
         name_parts[-2] = str(number)
         new_name = '.'.join(name_parts)
         return new_name
+
+    def __getattr__(self, name):
+        """Provide a way to handle requests for non-existing attributes."""
+        self._print(2, "Requested attribute '{:s}' does not yet exist..."
+                    .format(name))
+        if '__' in name:
+            name_actual = name.replace('__', '/')
+            return self.read_data(name_actual, store=None, trial=True)
+        return self.read_data(name, store=None, trial=True)
+
+    def _print(self, threshold, *args, **kwargs):
+
+        if isinstance(threshold, int):
+            verbose = self.verbose
+            thresh = threshold
+        else:
+            thresh = threshold[0]
+            if len(threshold) == 1 or threshold[1] is None:
+                verbose = self.verbose
+            else:
+                verbose = threshold[1]
+
+        if verbose >= thresh:
+            print(*args, **kwargs)
 
     def find_subhalo(self, ids=None, return_matched=False):
         """On-the-fly retrieval of particle subhalo indices.
