@@ -282,7 +282,7 @@ def read_attribute(fileName, container, attName,
         f = h5.File(fileName, 'r')
         att = f[container].attrs[attName]
         f.close()
-    except:
+    except KeyError:
         if not require:
             return default
         raise Exception("Did not find specified attribute '{:s}' in "
