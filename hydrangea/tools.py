@@ -119,7 +119,7 @@ def aexp_to_time(aexp, time_type='age'):
     if time_type == 'zred':
         return 1/aexp - 1
 
-    if len(aexp) < 1000:
+    if np.isscalar(aexp) or len(aexp) < 1000:
         if time_type == 'age':
             return Planck13.age(1/aexp - 1).to(u.Gyr).value
         if time_type == 'lbt':
