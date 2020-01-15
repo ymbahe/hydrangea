@@ -71,9 +71,6 @@ class SplitFile(ReaderBase):
             print("Prepared reading from '{:s}'..."
                   .format(self.group_name.upper()))
 
-        # For now, don't build offset list
-        self.file_offsets = None
-
     def read_data(self, dataset_name, verbose=False, astro=True,
                   return_conv=False):
         """Read a specified data set from the file collection.
@@ -108,9 +105,11 @@ class SplitFile(ReaderBase):
         # Read individual files
         if self.num_elem is not None:
             if self.file_offsets is not None:
-                data_out = self._read_files_direct(dataset_name)
+                data_out = self._read_files_direct(dataset_name,
+                                                   verbose=verbose)
             else:
-                data_out = self._read_files_sequentially(dataset_name)
+                data_out = self._read_files_sequentially(dataset_name,
+                                                         verbose=verbose)
         else:
             # Use HAC if we don't know how many elements to read in total
             data_out = self._read_files_hac(dataset_name)
@@ -232,7 +231,6 @@ class SplitFile(ReaderBase):
         data_out : np.array or None
             The updated (or newly initialized) output array.
         """
-
         if verbose:
             print(str(ifile) + " ", end="", flush=True)
 
@@ -284,8 +282,7 @@ class SplitFile(ReaderBase):
         return length, data_out
 
     def _decode_ptype(self, ptype):
-        """Identify supplied particle type"""
-
+        """Identify supplied particle type."""
         if isinstance(ptype, int):
             self.group_name = 'PartType{:d}' .format(ptype)
         elif isinstance(ptype, str):
@@ -313,7 +310,7 @@ class SplitFile(ReaderBase):
             self._num_elem = self._count_elements()
         return self._num_elem
 
-    def _count_elements(self):
+    def _count_elements(self, file=None):
         """Count number of elements to read."""
         num_elem = None   # Placeholder for "not known"
         if self.group_name is None:
@@ -331,27 +328,42 @@ class SplitFile(ReaderBase):
         # Deal with particle catalogue files
         if (file_name_parts[0] in ['snap', 'snip', 'partMags',
                                    'eagle_subfind_particles']):
-            if self.verbose:
+            if self.verbose and file is None:
                 print("Particle catalogue detected!")
             # Need to extract particle index to count (mag --> stars!)
             if self.group_name.startswith('PartType'):
-                num_elem = self._count_elements_snap(pt_index)
+                if file is None:
+                    num_elem = self._count_elements_snap(pt_index)
+                else:
+                    num_elem = self._count_file_elements_snap(file, pt_index)
             elif file_name_parts[0] == 'partMags':
-                num_elem = self._count_elements_snap(4)
+                if file is None:
+                    num_elem = self._count_elements_snap(4)
+                else:
+                    num_elem = self._count_file_elements_snap(file, 4)
             else:
                 return    # Can't determine element numbers then
 
         # Deal with subfind catalogue files
         elif len(file_name_parts) >= 2:
             if "_".join(file_name_parts[:3]) == 'eagle_subfind_tab':
-                if self.verbose:
+                if self.verbose and file is None:
                     print("Subfind catalogue detected!")
                 if self.group_name == 'FOF':
-                    num_elem = self._count_elements_sf_fof()
+                    if file is None:
+                        num_elem = self._count_elements_sf_fof()
+                    else:
+                        num_elem = self._count_file_elements_sf_fof(file)
                 elif self.group_name == 'Subhalo':
-                    num_elem = self._count_elements_sf_subhalo()
+                    if file is None:
+                        num_elem = self._count_elements_sf_subhalo()
+                    else:
+                        num_elem = self._count_file_elements_sf_subhalo(file)
                 elif self.group_name == 'IDs':
-                    num_elem = self._count_elements_sf_ids()
+                    if file is None:
+                        num_elem = self._count_elements_sf_ids()
+                    else:
+                        num_elem = self._count_file_elements_sf_ids(file)
                 else:
                     return
 
@@ -389,6 +401,30 @@ class SplitFile(ReaderBase):
         return hd.read_attribute(
             self.file_name, 'Header', 'TotNids', require=True)
 
+    def _count_file_elements_snap(self, file, pt_index):
+        """Count number of particles of specified (int) type."""
+        return hd.read_attribute(
+            self._swap_file_name(self.file_name, file),
+            'Header', 'NumPart_ThisFile', require=True)[pt_index]
+
+    def _count_file_elements_sf_fof(self, file):
+        """Count number of FOF groups in Subfind catalogue."""
+        return hd.read_attribute(
+            self._swap_file_name(self.file_name, file),
+            'Header', 'Ngroups', require=True)
+
+    def _count_file_elements_sf_subhalo(self, file):
+        """Count number of subhaloes in Subfind catalogue."""
+        return hd.read_attribute(
+            self._swap_file_name(self.file_name, file),
+            'Header', 'Nsubgroups', require=True)
+
+    def _count_file_elements_sf_ids(self, file):
+        """Count number of particle IDs in Subfind catalogue."""
+        return hd.read_attribute(
+            self._swap_file_name(self.file_name, file),
+            'Header', 'Nids', require=True)
+
     @property
     def num_files(self):
         """Count number of files to read."""
@@ -404,3 +440,33 @@ class SplitFile(ReaderBase):
                 print("Unknown simulation type '{:s}'." .format(self.sim_type))
                 set_trace()
         return self._num_files
+
+    @property
+    def file_offsets(self):
+        """List offset of each file in total data set."""
+        if '_file_offsets' not in dir(self):
+            pm_file_name = (os.path.dirname(self.file_name)
+                            + '/ParticleMap.hdf5')
+            if os.path.exists(pm_file_name):
+                self._find_file_offsets_from_map(pm_file_name)
+            else:
+                self._find_file_offsets()
+        return self._file_offsets
+
+    def _find_file_offsets_from_map(self, map_file_name):
+        """Extract offsets of each file in total data set from map."""
+        self._file_offsets = hd.read_attribute(
+            map_file_name, self.group_name, 'FileOffset')
+
+    def _find_file_offsets(self):
+        """Find file offsets sequentially from individual files."""
+        self._file_offsets = np.zeros(self.num_files + 1, dtype=int)
+        for ifile in range(self.num_files):
+            length = self._count_elements(ifile)
+
+            # Abandon ship if even one file cannot be measured
+            if length is None:
+                self._file_offsets = None
+                return
+
+            self._file_offsets[ifile+1] = self._file_offsets[ifile] + length
