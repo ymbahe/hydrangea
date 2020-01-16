@@ -195,14 +195,14 @@ class SplitFile(ReaderBase):
             # Find number of elements to read in this file
             start = 0
             end = self.file_offsets[ifile+1] - self.file_offsets[ifile]
+            write_offset = self.file_offsets[ifile]
             if self.read_range is not None:
                 if ifile == self.read_start[0]:
                     start = self.read_start[1]
                 if ifile == self.read_end[0]:
                     end = self.read_end[1]
+                write_offset += (start - self.read_range[0])
             num_exp = end - start
-            write_offset = (start + self.file_offsets[ifile]
-                            - self.read_range[0])
 
             if num_exp > 0:
                 num_read, data_out = self._read_file(
