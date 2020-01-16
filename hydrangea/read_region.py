@@ -893,7 +893,7 @@ class ReadRegion(ReaderBase):
             self.offsets[ind_join] -= len_extra
             self.lengths[ind_join] += len_extra
         num_joins = len(ind_join)
-        self._print(1, "Identified {:d} joins for {:d} segments..."
+        self._print(2, "Identified {:d} joins for {:d} segments..."
                     .format(num_joins, self.num_segments))
 
         # Don't need to do anything if there's nothing to do
