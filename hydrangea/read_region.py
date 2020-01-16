@@ -395,7 +395,7 @@ class ReadRegion(ReaderBase):
     # `````````````````` End of read_data() ''''''''''''''''''''''''''''
 
     def total_in_region(self, dataset_name, average=False,
-                        weight_quant=None, astro=False):
+                        weight_quant=None, astro=True):
         """
         Compute the total or average of 'quantity' [convenience function].
 
