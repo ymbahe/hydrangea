@@ -557,7 +557,6 @@ class ReadRegion(ReaderBase):
                     (np.min(rel_pos, axis=1) >= 0) &
                     (np.max(rel_pos - length[None, :]) <= 0))[0]
             else:
-                set_trace()
                 self.ind_sel = np.nonzero(
                     np.max(np.abs(rel_pos) - length[None, :], axis=1) <= 0)[0]
         else:
