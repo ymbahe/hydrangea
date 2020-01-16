@@ -284,7 +284,8 @@ def read_attribute(file_name, container, att_name,
     return att
 
 
-def read_data(file_name, container, range=None, require=False):
+def read_data(file_name, container, read_range=None, read_index=None,
+              index_dim=0, require=False):
     """
     Read one dataset from an HDF5 file.
 
@@ -297,10 +298,18 @@ def read_data(file_name, container, range=None, require=False):
     container : string
         The name of the data set, including possibly containing groups
         (e.g. 'well/nested/group/data').
-    range : list or tuple of length 2, optional
-        First and beyond-last element to read from the data set. If None
-        (default), the entire data set is read in. If the first (last) element
-        is None, the array is read from the start (to the end).
+    read_range : (int, int) or None, optional
+        Read only elements from the first up to *but excluding* the
+        second entry in the tuple (in dimension 0). If None (default),
+        read the entire file. Ignored if read_index is provided.
+    read_index : int or np.array(int) or None, optional
+        Read only the elements in read_index (in dimension 0). If int,
+        a single element is read, and the first dimension truncated. If
+        an array is provided, the elements between the lowest and
+        highest index are read and the output then masked to the
+        exact elements. If None (default), everything is read.
+    index_dim : int, optional
+        Dimension over which to apply the read cuts (default: 0).
     require : bool, optional
         Require the presence of the data set, and raise an exception if it
         does not exist. If False (default), return None.
@@ -315,32 +324,43 @@ def read_data(file_name, container, range=None, require=False):
         dSet = f[container]
         data_type = f[container].dtype
         data_shape = f[container].shape
-        data_size = data_shape[0]
+
+        # Over-write read_range if read_index is provided
+        if isinstance(read_index, int):
+            read_range = (read_index, read_index+1)
+        elif read_index is not None:
+            read_range = (np.min(read_index), np.max(read_index) + 1)
 
         # Work out portion of data set to read
-        if range is None:
-            first = 0
-            stop = data_size
-        else:
-            first = range[0]
-            stop = range[1]
-        if first is None:
-            first = 0
-        if stop is None:
-            stop = data_size
-
-        # Set up output array
         out_shape = list(data_shape)
-        out_shape[0] = stop - first
+        if read_range is not None:
+            first, stop = read_range
+            out_shape[index_dim] = stop - first
         data_out = np.empty(out_shape, data_type)
 
-        # Only need to bother reading from non-zero dataset
-        if data_size > 0:
-            if first == 0 and stop == data_size:
+        # Only need to bother reading non-empty data
+        if f[container].size > 0 and out_shape[index_dim] > 0:
+            if read_range is None:
                 dSet.read_direct(data_out)
             else:
-                data_out = dSet[first:stop, ...]
+                slice_object = [np.s_[:]] * len(data_shape)
+                slice_object[index_dim] = np.s_[first:stop]
+                data_out = dSet[tuple(slice_object)]
         f.close()
+
+        # Apply final truncation if needed
+        if isinstance(read_index, int):
+            if data_out.ndim == 1:
+                data_out = data_out[0]
+            else:
+                slice_object = [np.s_[:]] * len(data_shape)
+                slice_object[index_dim] = 0
+                data_out = data_out[tuple(slice_object)]
+        elif read_index is not None:
+            ind_sel = read_index - read_range[0]
+            slice_object = [np.s_[:]] * len(data_shape)
+            slice_object[index_dim] = ind_sel
+            data_out = data_out[tuple(slice_object)]
 
     except KeyError:
         if not require:
