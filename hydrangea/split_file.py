@@ -271,7 +271,7 @@ class SplitFile(ReaderBase):
         self._print((1, verbose), "")  # Ends no-newline sequence
 
         # Need to do final concatenation after loop ends
-        if data_stack is not None and len(data_stack):
+        if data_stack is not None and len(data_stack) > 0:
             self._print((1, verbose), "Final concatenation...")
             data_out = np.concatenate((data_out, data_stack))
 
@@ -409,7 +409,7 @@ class SplitFile(ReaderBase):
         """Count number of elements to read."""
         num_elem = None   # Placeholder for "not known"
         if self.base_group is None:
-            return
+            return None
 
         # Break file name into base and running sequence number
         real_file_name = os.path.split(self.file_name)[1]
@@ -437,7 +437,7 @@ class SplitFile(ReaderBase):
                 else:
                     num_elem = self._count_file_elements_snap(file, 4)
             else:
-                return    # Can't determine element numbers then
+                return None    # Can't determine element numbers then
 
         # Deal with subfind catalogue files
         elif len(file_name_parts) >= 2:
@@ -460,12 +460,12 @@ class SplitFile(ReaderBase):
                     else:
                         num_elem = self._count_file_elements_sf_ids(file)
                 else:
-                    return
+                    return None
 
         # In all other cases, don't know how to pre-determine
         # element count, so need to find out from individual files (later).
         else:
-            return
+            return None
 
         # Final piece: deal with possibility of int32 overflow in numbers
         # (it does happen somewhere...)
@@ -605,5 +605,7 @@ class SplitFile(ReaderBase):
             file = offset = 0
         if file >= self.num_files:
             self._print(1, "Truncating upper read end to {:d} (was {:d})"
-                        .format(self.file_offsets[-1]))
+                        .format(self.file_offsets[-1], index))
+            file = self.num_files - 1
+            offset = self.file_ofsets[-1] - self.file_offsets[-2]
         return (file, offset)
