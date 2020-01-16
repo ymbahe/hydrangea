@@ -7,7 +7,7 @@ import os
 
 import hydrangea as hy
 
-BASE_DIR = '/virgo/simulations/Hydrangea/'
+BASE_DIR = '/net/quasar/data3/Hydrangea/'
 
 
 class Simulation:
@@ -48,7 +48,7 @@ class Simulation:
         """Form the (first) file of a given subfind catalogue."""
         return hy.form_files(self.run_dir, index, types='sub')
 
-
+    
 class Cantor:
     """Representation of a Cantor catalogue."""
 
