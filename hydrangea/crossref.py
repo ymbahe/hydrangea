@@ -79,6 +79,9 @@ class Gate:
         if verbose:
             print("Beginning gate setup...")
 
+        #if isinstance(ids_ext, int):
+        #    ids_ext = np.array([ids_ext])
+
         self.rev_IDs = None   # Default for consistency
 
         if rev_IDs is None:
