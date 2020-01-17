@@ -329,7 +329,10 @@ def read_data(file_name, container, read_range=None, read_index=None,
         if isinstance(read_index, int):
             read_range = (read_index, read_index+1)
         elif read_index is not None:
-            read_range = (np.min(read_index), np.max(read_index) + 1)
+            if len(read_index) > 0:
+                read_range = (np.min(read_index), np.max(read_index) + 1)
+            else:
+                read_range = (0, 0)
 
         # Work out portion of data set to read
         out_shape = list(data_shape)
