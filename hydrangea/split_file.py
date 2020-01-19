@@ -421,8 +421,8 @@ class SplitFile(ReaderBase):
             pt_index = None   # For checking
 
         # Deal with particle catalogue files
-        if (file_name_parts[0] in ['snap', 'snip', 'partMags',
-                                   'eagle_subfind_particles']):
+        if (file_name_parts[0] in ['snap', 'snip', 'partMags'] or
+            real_file_name.startswith('eagle_subfind_particles')):
             if file is None:
                 self._print(2, "   Particle catalogue detected... ", end="")
             # Need to extract particle index to count (mag --> stars!)
