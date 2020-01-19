@@ -4,6 +4,7 @@ import glob
 import h5py as h5
 import numpy as np
 import os
+import hydrangea.hdf5 as hd
 
 from astropy.io import ascii
 from astropy.cosmology import Planck13
@@ -172,6 +173,68 @@ def get_astro_conv(file_name, dataset_name):
 
     astro_conv = aexp**ascale_exponent * h_hubble**hscale_exponent
     return astro_conv
+
+
+def get_m_dm(file_name, astro=True):
+    """Retrieve the DM particle mass from a particle file."""
+    m_dm = hd.read_attribute(file_name, 'Header', 'MassTable')[0]
+    if astro:
+        m_dm /= hd.read_attribute(file_name, 'Header', 'HubbleParam')
+    return m_dm
+
+
+def get_m_baryon(file_name, astro=True):
+    """Retrieve the initial baryon mass from a particle file."""
+    m_dm = get_m_dm(file_name, astro=astro)
+    omega_matter = hd.read_attribute(file_name, 'Header', 'Omega0')
+    omega_baryon = hd.read_attribute(file_name, 'Header', 'Omega_Baryon')
+    return m_dm * omega_baryon/omega_matter / (1-omega_baryon/omega_matter)
+
+
+def ind_to_block(indices, offsets, lengths=None):
+    """Find the block for a set of indices in an offset-separated list.
+
+    Each block i contains elements from indices offsets[i] up to and
+    including offsets[i]+length[i]-1. This can, for example, be used to
+    translate particle indices in a Subfind-ID list into the corresponding
+    subhalo or FOF index.
+
+    Parameters
+    ----------
+    indices : ndarray(int)
+        The indices of elements whose blocks to find.
+    offsets : ndarray(int)
+        The index of the first element in each block.
+    lengths : ndarray(int), optional
+        The number of elements in each block. If None (default), it is
+        assumed that the blocks are contiguous, i.e. all elements between
+        offsets[i] and offsets[i+1] belong to block i.
+
+    Returns
+    -------
+    blocks : ndarray(int)
+        The block index for each input element (-1 if not found).
+
+    Note
+    ----
+    When lengths is not provided, it is advisable to append a `coda'
+    to offsets, i.e. a trailing entry with the total number of elements
+    assigned to blocks. This enables the correct identification of
+    (potential) input elements beyond the range of the last block.
+    """
+    block_guess = np.searchsorted(offsets, indices, side='right')-1
+
+    if lengths is None:
+        ind_good_guess = np.nonzero(block_guess >= 0)[0]
+    else:
+        ind_good_guess = np.nonzero(
+            (indices >= offsets[block_guess]) &
+            (indices < offsets[block_guess] + lengths[block_guess]))[0]
+
+    block_index = np.zeros(len(indices), dtype=np.int32) - 1
+    block_index[ind_good_guess] = block_guess[ind_good_guess]
+
+    return block_index
 
 
 def form_files(sim_dir, index, types='sub', snep_type='snap'):
