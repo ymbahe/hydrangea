@@ -30,6 +30,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="http://www.leidenuniv.nl",
+    include_package_data=True,
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
