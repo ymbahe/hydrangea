@@ -11,7 +11,7 @@ from pdb import set_trace
 
 import hydrangea.hdf5 as hdf5
 import hydrangea.crossref as xr
-from hydrangea.split_file import SplitFile
+from hydrangea.split_file import SplitFile, get_subfind_index, get_fof_index
 from hydrangea.reader_base import ReaderBase
 
 
@@ -448,6 +448,22 @@ class ReadRegion(ReaderBase):
     # --------------------------------------------------------------
     # ----------- INTERNAL-ONLY FUNCTIONS BELOW --------------------
     # --------------------------------------------------------------
+
+    @property
+    def SubhaloIndex(self):
+        """Emulate a non-existing subhalo index for all particles."""
+        if '_subhalo_index' not in dir(self):
+            self._subhalo_index = get_subfind_index(self.ParticleIDs,
+                                                    self.subfind_file)
+        return self._subhalo_index
+
+    @property
+    def GroupIndex(self):
+        """Emulate a non-existing group index for all particles."""
+        if '_group_index' not in dir(self):
+            self._group_index = get_fof_index(self.ParticleIDs,
+                                              self.subfind_file)
+        return self._group_index
 
     def _setup_region(self, map_file, join_threshold=20,
                       bridge_threshold=20, bridge_gap_factor=0.5):

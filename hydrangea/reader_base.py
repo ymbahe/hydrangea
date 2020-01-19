@@ -4,8 +4,7 @@ import numpy as np
 import h5py as h5
 import hydrangea.tools as ht
 import hydrangea.hdf5 as hd
-import hydrangea.crossref as hx
-from hydrangea.split_file import SplitFile
+
 from pdb import set_trace  # [Will be used later]
 
 
@@ -158,67 +157,6 @@ class ReaderBase:
 
         if verbose >= thresh:
             print(*args, **kwargs)
-
-    def find_group(self, ids=None, group_type="subfind",
-                   return_matched=False):
-        """On-the-fly retrieval of particle group indices.
-
-        This is achieved by cross-matching particle IDs between the
-        snapshot catalogue and the corresponding Subfind catalogue.
-
-        Parameters
-        ----------
-        ids : np.array(int), optional
-            The particle IDs to match. If None (default), match all
-            particles of this data set.
-        group_type : str, optional
-            Type of group to find membership for. Possible values are
-            'subfind' (default) or 'fof'.
-        return_matched : bool, optional
-            Also find and return elements that are actually in a target
-            group block (default: False).
-
-        Returns
-        -------
-        shi : np.array(int)
-            The subhalo index for each particle (-1 for particles which are
-            not in a subhalo).
-        in_sh : np.array(int)
-            The indices of particles that could be located in a subhalo
-            (i.e. those whose shi is >= 0).
-
-        Note
-        ----
-        This is a convenience function to emulate a (non-existing)
-        'subhalo index' data set in snapshot catalogues. Depending on
-        circumstances, other approaches may be faster.
-        """
-        if ids is None:
-            ids = self.ParticleIDs
-
-        if group_type.lower() == 'subfind':
-            group_ids = SplitFile(self.subfind_file, 'IDs')
-            group_cat = SplitFile(self.subfind_file, 'Subhalo')
-            index_in_ids = hx.find_id_indices(ids, group_ids.ParticleID)[0]
-            offset = group_cat.SubOffset
-            group = ht.ind_to_block(index_in_ids, offset, group_cat.SubLength)
-        elif group_type.lower() == 'fof':
-            group_ids = SplitFile(self.subfind_file, 'IDs')
-            group_cat = SplitFile(self.subfind_file, 'FOF')
-            index_in_ids = hx.find_id_indices(ids, group_ids.ParticleID)[0]
-            offset = group_cat.GroupOffset
-            group = ht.ind_to_block(
-                index_in_ids, offset, group_cat.GroupLength)
-        else:
-            print(f"Invalid group_type ('{group_type}')")
-            set_trace()
-
-        if return_matched:
-            ind_matched = np.nonzero(
-                (group >= 0) & (group < len(offset)))[0]
-            return group, ind_matched
-        else:
-            return group
 
     @property
     def subfind_file(self):
