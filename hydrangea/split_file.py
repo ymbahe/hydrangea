@@ -556,6 +556,8 @@ class SplitFile(ReaderBase):
     @property
     def file_offsets(self):
         """List offset of each file in total data set."""
+        if self.read_range is None:
+            return None
         if '_file_offsets' not in dir(self):
             start_time = time.time()
             pm_file_name = (os.path.dirname(self.file_name)
