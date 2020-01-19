@@ -1,9 +1,11 @@
 """Provides a base class for specialized reader classes."""
 
+import numpy as np
 import h5py as h5
 import hydrangea.tools as ht
 import hydrangea.hdf5 as hd
-import hydrangea.crossref as hx  # [Will be used later]
+import hydrangea.crossref as hx
+from hydrangea.split_file import SplitFile
 from pdb import set_trace  # [Will be used later]
 
 
@@ -74,6 +76,29 @@ class ReaderBase:
             self._lbt = ht.aexp_to_time(self.aexp, 'lbt')
         return self._lbt
 
+    @property
+    def m_dm(self):
+        """Get the DM particle mass of a snapshot."""
+        if '_m_dm' not in dir(self):
+            if not self.base_group.startswith('PartType'):
+                print("*** Looks like you are trying to load m_dm for "
+                      "non-snapshot! ***")
+                set_trace()
+            self._m_dm = ht.get_m_dm(self.file_name, astro=self.astro)
+        return self._m_dm
+
+    @property
+    def m_baryon(self):
+        """Get the initial baryon mass of a snapshot."""
+        if '_m_baryon' not in dir(self):
+            if not self.base_group.startswith('PartType'):
+                print("*** Looks like you are trying to load m_baryon for "
+                      "non-snapshot! ***")
+                set_trace()
+            self.m_baryon = ht.get_m_baryon(self.file_name, astro=self.astro)
+        return self._m_baryon
+
+
     def get_time(self, timeType='aexp'):
         """Retrieve various possible time stamps of the output.
 
@@ -106,8 +131,18 @@ class ReaderBase:
                     .format(name))
         if '__' in name:
             name_actual = name.replace('__', '/')
+        else:
+            name_actual = name
+        if name_actual == 'SubhaloIndex':
+            if 'SubhaloIndex' not in dir(self):
+                self.SubhaloIndex = self.find_group(group_type='subfind')
+            return self.SubhaloIndex
+        elif name_actual == 'GroupIndex':
+            if 'GroupIndex' not in dir(self):
+                self.GroupIndex = self.find_group(group_type='fof')
+            return self.GroupIndex
+        else:
             return self.read_data(name_actual, store=None, trial=True)
-        return self.read_data(name, store=None, trial=True)
 
     def _print(self, threshold, *args, **kwargs):
 
@@ -124,8 +159,9 @@ class ReaderBase:
         if verbose >= thresh:
             print(*args, **kwargs)
 
-    def find_subhalo(self, ids=None, return_matched=False):
-        """On-the-fly retrieval of particle subhalo indices.
+    def find_group(self, ids=None, group_type="subfind",
+                   return_matched=False):
+        """On-the-fly retrieval of particle group indices.
 
         This is achieved by cross-matching particle IDs between the
         snapshot catalogue and the corresponding Subfind catalogue.
@@ -133,8 +169,14 @@ class ReaderBase:
         Parameters
         ----------
         ids : np.array(int), optional
-            The previously read particle IDs. If None (default), these will
-            be read in internally, at additional computational cost.
+            The particle IDs to match. If None (default), match all
+            particles of this data set.
+        group_type : str, optional
+            Type of group to find membership for. Possible values are
+            'subfind' (default) or 'fof'.
+        return_matched : bool, optional
+            Also find and return elements that are actually in a target
+            group block (default: False).
 
         Returns
         -------
@@ -150,7 +192,56 @@ class ReaderBase:
         This is a convenience function to emulate a (non-existing)
         'subhalo index' data set in snapshot catalogues. Depending on
         circumstances, other approaches may be faster.
-
-        This functionality is not yet implemented.
         """
-        pass
+        if ids is None:
+            ids = self.ParticleIDs
+
+        if group_type.lower() == 'subfind':
+            group_ids = SplitFile(self.subfind_file, 'IDs')
+            group_cat = SplitFile(self.subfind_file, 'Subhalo')
+            index_in_ids = hx.find_id_indices(ids, group_ids.ParticleID)[0]
+            offset = group_cat.SubOffset
+            group = ht.ind_to_block(index_in_ids, offset, group_cat.SubLength)
+        elif group_type.lower() == 'fof':
+            group_ids = SplitFile(self.subfind_file, 'IDs')
+            group_cat = SplitFile(self.subfind_file, 'FOF')
+            index_in_ids = hx.find_id_indices(ids, group_ids.ParticleID)[0]
+            offset = group_cat.GroupOffset
+            group = ht.ind_to_block(
+                index_in_ids, offset, group_cat.GroupLength)
+        else:
+            print(f"Invalid group_type ('{group_type}')")
+            set_trace()
+
+        if return_matched:
+            ind_matched = np.nonzero(
+                (group >= 0) & (group < len(offset)))[0]
+            return group, ind_matched
+        else:
+            return group
+
+    @property
+    def subfind_file(self):
+        """Subfind catalogue file belonging to a snapshot."""
+        if '_subfind_file' not in dir(self):
+            print("Need to set a corresponding subfind file!")
+            set_trace()
+        return self._subfind_file
+
+    @subfind_file.setter
+    def subfind_file(self, cat_file):
+        """Set a subfind catalogue file to associate with this file."""
+        self._subfind_file = cat_file
+
+    @property
+    def cantor_file(self):
+        """Cantor catalogue file belonging to a snapshot."""
+        if '_cantor_file' not in dir(self):
+            print("Need to set a corresponding cantor file first!")
+            set_trace()
+        return self._cantor_file
+
+    @cantor_file.setter
+    def cantor_file(self, cat_file):
+        """Set a cantor catalogue file to associate with this file."""
+        self._subfind_file = cat_file
