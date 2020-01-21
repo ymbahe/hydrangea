@@ -7,6 +7,7 @@ import h5py as h5
 from pdb import set_trace
 import hydrangea.hdf5 as hd
 import hydrangea.tools as ht
+import hydrangea.crossref as hx
 from hydrangea.reader_base import ReaderBase
 import time
 
@@ -421,8 +422,8 @@ class SplitFile(ReaderBase):
             pt_index = None   # For checking
 
         # Deal with particle catalogue files
-        if (file_name_parts[0] in ['snap', 'snip', 'partMags',
-                                   'eagle_subfind_particles']):
+        if (file_name_parts[0] in ['snap', 'snip', 'partMags'] or
+            real_file_name.startswith('eagle_subfind_particles')):
             if file is None:
                 self._print(2, "   Particle catalogue detected... ", end="")
             # Need to extract particle index to count (mag --> stars!)
@@ -520,6 +521,22 @@ class SplitFile(ReaderBase):
             'Header', 'Nids', require=True)
 
     @property
+    def SubhaloIndex(self):
+        """Emulate a non-existing subhalo index for all particles."""
+        if '_subhalo_index' not in dir(self):
+            self._subhalo_index = get_subfind_index(self.ParticleIDs,
+                                                    self.subfind_file)
+        return self._subhalo_index
+
+    @property
+    def GroupIndex(self):
+        """Emulate a non-existing group index for all particles."""
+        if '_group_index' not in dir(self):
+            self._group_index = get_fof_index(self.ParticleIDs,
+                                              self.subfind_file)
+        return self._group_index
+
+    @property
     def num_files(self):
         """Count number of files in the data set."""
         if '_num_files' not in dir(self):
@@ -539,6 +556,8 @@ class SplitFile(ReaderBase):
     @property
     def file_offsets(self):
         """List offset of each file in total data set."""
+        if self.read_range is None:
+            return None
         if '_file_offsets' not in dir(self):
             start_time = time.time()
             pm_file_name = (os.path.dirname(self.file_name)
@@ -609,3 +628,87 @@ class SplitFile(ReaderBase):
             file = self.num_files - 1
             offset = self.file_ofsets[-1] - self.file_offsets[-2]
         return (file, offset)
+
+
+def get_subfind_index(ids, subfind_file, return_matched=False):
+    """Get the subfind subhalo indices for input particle IDs.
+
+    Parameters
+    ----------
+    ids : np.array(int)
+        The particle IDs to match.
+    return_matched : bool, optional
+        Also find and return elements that are actually in a target
+        group block (default: False).
+
+    Returns
+    -------
+    shi : np.array(int)
+        The subhalo index for each particle (-1 for particles which are
+        not in a subhalo).
+    in_sh : np.array(int), optional
+        The indices of particles that could be located in a subhalo
+        (i.e. those whose shi is >= 0). Only returned if return_matched
+        is True.
+
+    Note
+    ----
+    This is a convenience function to emulate a (non-existing)
+    'subhalo index' data set in snapshot catalogues. Depending on
+    circumstances, other approaches may be faster.
+    """
+    subfind_ids = SplitFile(subfind_file, 'IDs')
+    subfind_cat = SplitFile(subfind_file, 'Subhalo')
+    index_in_ids = hx.find_id_indices(ids, subfind_ids.ParticleID)[0]
+    subhalo_index = ht.ind_to_block(index_in_ids, subfind_cat.SubOffset,
+                                    subfind_cat.SubLength)
+
+    if return_matched:
+        in_sh = np.nonzero(
+            (subhalo_index >= 0) &
+            (subhalo_index < len(subfind_cat.SubOffset)))[0]
+        return subhalo_index, in_sh
+    else:
+        return subhalo_index
+
+
+def get_fof_index(ids, subfind_file, return_matched=False):
+    """Get the subfind FOF indices for input particle IDs.
+
+    Parameters
+    ----------
+    ids : np.array(int)
+        The particle IDs to match.
+    return_matched : bool, optional
+        Also find and return elements that are actually in a target
+        group block (default: False).
+
+    Returns
+    -------
+    fof_index : np.array(int)
+        The FOF group index for each particle (-1 for particles which are
+        not in a FOF group).
+    in_fof : np.array(int), optional
+        The indices of particles that could be located in a FOF group
+        (i.e. those whose fof_index is >= 0). Only returned if
+        return_matched is True.
+
+    Note
+    ----
+    This is a convenience function to emulate a (non-existing)
+    'group index' data set in snapshot catalogues. Depending on
+    circumstances, other approaches may be faster.
+    """
+    subfind_ids = SplitFile(subfind_file, 'IDs')
+    subfind_cat = SplitFile(subfind_file, 'FOF')
+    index_in_ids = hx.find_id_indices(ids, subfind_ids.ParticleID)[0]
+    fof_index = ht.ind_to_block(index_in_ids, subfind_cat.GroupOffset,
+                                subfind_cat.GroupLength)
+
+    if return_matched:
+        in_fof = np.nonzero(
+            (fof_index >= 0) &
+            (fof_index < len(subfind_cat.GroupOffset)))[0]
+        return fof_index, in_fof
+    else:
+        return fof_index

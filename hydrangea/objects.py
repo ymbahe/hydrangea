@@ -65,7 +65,7 @@ class Cantor:
     catalogue as well.
     """
 
-    def __init__(self, sim, index=None, snap_type='snap',
+    def __init__(self, sim, index=None, snap_type='snap', cantor_dir=None,
                  group='Subhalo', read_range=None, read_index=None,
                  index_dim=0):
         """Object constructor.
@@ -80,6 +80,9 @@ class Cantor:
         snap_type : str, optional
             Whether this Cantor catalogue belongs to a snapshot
             ('snap', default), or snipshot ('snip').
+        cantor_dir : str, optional
+            The name of the Cantor catalogue directory. If None (default),
+            it is loaded from the Simulation instance sim.
         read_range : (int, int) or None, optional
             Read only elements from the first up to *but excluding* the
             second entry in the tuple (in dimension 0). If None (default),
@@ -92,17 +95,19 @@ class Cantor:
             exact elements. If None (default), everything is read.
         """
         # Set up paths to catalogue files
+        if cantor_dir is None:
+            cantor_dir = sim.cantor_dir
         if index is not None:
-            self.catloc = sim.cantor_dir + f'Cantor_{index:03d}.hdf5'
+            self.catloc = cantor_dir + f'Cantor_{index:03d}.hdf5'
             if not os.path.isfile(self.catloc):
                 print(f"Cantor catalogue {index} not found!")
                 set_trace()
                 self.catloc = None
                 return
-            self.idloc = sim.cantor_dir + f'Cantor_{index:03d}_IDs.hdf5'
+            self.idloc = cantor_dir + f'Cantor_{index:03d}_IDs.hdf5'
             if not os.path.isfile(self.idloc):
                 self.idloc = None
-            self.radloc = sim.cantor_dir + f'Cantor_{index:03d}_Radii.hdf5'
+            self.radloc = cantor_dir + f'Cantor_{index:03d}_Radii.hdf5'
             if not os.path.isfile(self.radloc):
                 self.radloc = None
         else:

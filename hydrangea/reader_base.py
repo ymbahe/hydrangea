@@ -1,9 +1,11 @@
 """Provides a base class for specialized reader classes."""
 
+import numpy as np
 import h5py as h5
 import hydrangea.tools as ht
+import hydrangea.units as hu
 import hydrangea.hdf5 as hd
-import hydrangea.crossref as hx  # [Will be used later]
+
 from pdb import set_trace  # [Will be used later]
 
 
@@ -14,6 +16,69 @@ class ReaderBase:
     astronomical units, on-the-fly luminosity calculation, and
     cross-matching of particle IDs to subhalo catalogues.
     """
+
+    def get_unit_conversion(self, dataset_name, units_name):
+        """Get appropriate factor to convert data units to other system."""
+        if units_name == 'data':
+            data_to_other = 1
+        elif units_name == 'clean':
+            data_to_other = self.get_clean_factor(dataset_name)
+        elif units_name == 'astro':
+            data_to_other = (self.get_clean_factor(dataset_name)
+                             * self.get_astro_factor(dataset_name))
+        elif units_name == 'cgs':
+            data_to_other = (self.get_clean_factor(dataset_name)
+                             * self.get_cgs_factor(dataset_name))
+        elif units_name == 'si':
+            data_to_other = (self.get_clean_factor(dataset_name)
+                             * self.get_si_factor(dataset_name))
+        else:
+            print(f"Unknown unit system requested: '{units_name}'!")
+            set_trace()
+
+        return data_to_other
+
+    def get_clean_factor(self, dataset_name):
+        """Get the conversion factor to 'clean data units' (no h or a)."""
+        f = h5.File(self.file_name, 'r')
+        dSet = f[self.base_group + '/' + dataset_name]
+
+        try:
+            hscale_exponent = dSet.attrs["h-scale-exponent"]
+            ascale_exponent = dSet.attrs["aexp-scale-exponent"]
+
+            header = f["/Header"]
+            aexp = header.attrs["ExpansionFactor"]
+            h_hubble = header.attrs["HubbleParam"]
+        except(KeyError):
+            f.close()
+            return None
+        return aexp**ascale_exponent * h_hubble**hscale_exponent
+
+    def get_astro_factor(self, dataset_name):
+        """Get the conversion factor to 'astronomical units'."""
+        data_to_cgs_factor = self.get_cgs_factor(self, dataset_name)
+        if data_to_cgs_factor is None:
+            return None
+
+        dimensions = hu.get_dimensions(self.base_group, dataset_name)
+        cgs_to_astro_factor = (hu.si_to_astro_factor(dimensions)
+                               / hu.si_to_cgs_factor(dimensions))
+        return data_to_cgs_factor * cgs_to_astro_factor
+
+    def get_cgs_factor(self, dataset_name):
+        """Get the conversion factor to CGS units (boo, hiss)."""
+        return hd.read_attribute(self.file_name, dataset_name, 'CGS_Factor')
+
+    def get_si_factor(self, dataset_name):
+        """Get the conversion factor to SI units."""
+        data_to_cgs_factor = self.get_cgs_factor(self, dataset_name)
+        if data_to_cgs_factor is None:
+            return None
+
+        dimensions = hu.get_dimensions(self.base_group, dataset_name)
+        cgs_to_si_factor = 1 / hu.si_to_cgs_factor(dimensions)
+        return data_to_cgs_factor * cgs_to_si_factor
 
     def get_astro_conv(self, dataset_name):
         """Get the conversion factor to astronomical units for a data set.
@@ -74,6 +139,29 @@ class ReaderBase:
             self._lbt = ht.aexp_to_time(self.aexp, 'lbt')
         return self._lbt
 
+    @property
+    def m_dm(self):
+        """Get the DM particle mass of a snapshot."""
+        if '_m_dm' not in dir(self):
+            if not self.base_group.startswith('PartType'):
+                print("*** Looks like you are trying to load m_dm for "
+                      "non-snapshot! ***")
+                set_trace()
+            self._m_dm = ht.get_m_dm(self.file_name, units=self.units)
+        return self._m_dm
+
+    @property
+    def m_baryon(self):
+        """Get the initial baryon mass of a snapshot."""
+        if '_m_baryon' not in dir(self):
+            if not self.base_group.startswith('PartType'):
+                print("*** Looks like you are trying to load m_baryon for "
+                      "non-snapshot! ***")
+                set_trace()
+            self.m_baryon = ht.get_m_baryon(self.file_name, units=self.units)
+        return self._m_baryon
+
+
     def get_time(self, timeType='aexp'):
         """Retrieve various possible time stamps of the output.
 
@@ -106,8 +194,18 @@ class ReaderBase:
                     .format(name))
         if '__' in name:
             name_actual = name.replace('__', '/')
+        else:
+            name_actual = name
+        if name_actual == 'SubhaloIndex':
+            if 'SubhaloIndex' not in dir(self):
+                self.SubhaloIndex = self.find_group(group_type='subfind')
+            return self.SubhaloIndex
+        elif name_actual == 'GroupIndex':
+            if 'GroupIndex' not in dir(self):
+                self.GroupIndex = self.find_group(group_type='fof')
+            return self.GroupIndex
+        else:
             return self.read_data(name_actual, store=None, trial=True)
-        return self.read_data(name, store=None, trial=True)
 
     def _print(self, threshold, *args, **kwargs):
 
@@ -124,33 +222,28 @@ class ReaderBase:
         if verbose >= thresh:
             print(*args, **kwargs)
 
-    def find_subhalo(self, ids=None, return_matched=False):
-        """On-the-fly retrieval of particle subhalo indices.
+    @property
+    def subfind_file(self):
+        """Subfind catalogue file belonging to a snapshot."""
+        if '_subfind_file' not in dir(self):
+            print("Need to set a corresponding subfind file!")
+            set_trace()
+        return self._subfind_file
 
-        This is achieved by cross-matching particle IDs between the
-        snapshot catalogue and the corresponding Subfind catalogue.
+    @subfind_file.setter
+    def subfind_file(self, cat_file):
+        """Set a subfind catalogue file to associate with this file."""
+        self._subfind_file = cat_file
 
-        Parameters
-        ----------
-        ids : np.array(int), optional
-            The previously read particle IDs. If None (default), these will
-            be read in internally, at additional computational cost.
+    @property
+    def cantor_file(self):
+        """Cantor catalogue file belonging to a snapshot."""
+        if '_cantor_file' not in dir(self):
+            print("Need to set a corresponding cantor file first!")
+            set_trace()
+        return self._cantor_file
 
-        Returns
-        -------
-        shi : np.array(int)
-            The subhalo index for each particle (-1 for particles which are
-            not in a subhalo).
-        in_sh : np.array(int)
-            The indices of particles that could be located in a subhalo
-            (i.e. those whose shi is >= 0).
-
-        Note
-        ----
-        This is a convenience function to emulate a (non-existing)
-        'subhalo index' data set in snapshot catalogues. Depending on
-        circumstances, other approaches may be faster.
-
-        This functionality is not yet implemented.
-        """
-        pass
+    @cantor_file.setter
+    def cantor_file(self, cat_file):
+        """Set a cantor catalogue file to associate with this file."""
+        self._subfind_file = cat_file
