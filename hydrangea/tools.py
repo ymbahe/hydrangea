@@ -341,3 +341,81 @@ def _find_z_string(sim_dir, dir_type, index_string):
         return z_string
     else:
         return None
+
+
+def sum_bins(quant, *args):
+    """Sum up a quantity split by multiple indices.
+    
+    Parameters
+    ----------
+    quant : ndarray
+        The quant
+        
+    print("Binning up masses... ", end = '', flush = True)
+
+    mass_binned = np.zeros((7,                  # 7 possible origin codes       
+                            n_host,
+                            host_mhalo_nbins,
+                            root_mass_nbins,
+                            host_lograd_nbins,
+                            host_relrad_nbins,
+                            age_nbins,
+                            root_lograd_nbins), dtype = np.float64)
+
+
+    # *********** IMPORTANT ********************************                    
+    # This next line needs to be modified to point                              
+    # to the full path of where the library has been copied.                    
+    # *******************************************************                   
+
+    ObjectFile = "/u/ybahe/ANALYSIS/PACKAGES/lib/sumbinsXD.so"
+
+    c_numPart = c.c_long(numPt)
+    c_nbins_code = c.c_byte(7)
+    c_nbins_catHost = c.c_byte(n_host)
+    c_nbins_massHalo = c.c_byte(host_mhalo_nbins)
+    c_nbins_massRoot = c.c_byte(root_mass_nbins)
+    c_nbins_radHost = c.c_byte(host_lograd_nbins)
+    c_nbins_relradHost = c.c_byte(host_relrad_nbins)
+    c_nbins_age = c.c_byte(age_nbins)
+    c_nbins_radRoot = c.c_byte(root_lograd_nbins)
+
+    partMass_p = pt_mass.ctypes.data_as(c.c_void_p)
+
+    code_p = pt_code.ctypes.data_as(c.c_void_p)
+    hostCatBin_p = pt_host_cat.ctypes.data_as(c.c_void_p)
+    hostMhaloBin_p = pt_host_mhalo.ctypes.data_as(c.c_void_p)
+    rootMassBin_p = pt_root_mass.ctypes.data_as(c.c_void_p):
+    hostRadBin_p = pt_host_rad.ctypes.data_as(c.c_void_p)
+    hostRelradBin_p = pt_host_relrad.ctypes.data_as(c.c_void_p)
+    rootRadBin_p = pt_root_lograd.ctypes.data_as(c.c_void_p)
+    ageBin_p = pt_age.ctypes.data_as(c.c_void_p)
+
+    result_p = mass_binned.ctypes.data_as(c.c_void_p)
+
+    nargs = 19
+    myargv = c.c_void_p * nargs
+    argv = myargv(c.addressof(c_numPart),
+                  c.addressof(c_nbins_code),
+                  c.addressof(c_nbins_catHost),
+                  c.addressof(c_nbins_massHalo),
+                  c.addressof(c_nbins_massRoot),
+                  c.addressof(c_nbins_radHost),
+                  c.addressof(c_nbins_relradHost),
+                  c.addressof(c_nbins_age),
+                  c.addressof(c_nbins_radRoot),
+                  partMass_p,
+                  code_p,
+                  hostCatBin_p, hostMhaloBin_p, rootMassBin_p,
+                  hostRadBin_p, hostRelradBin_p, ageBin_p, rootRadBin_p,
+                  result_p)
+
+    lib = c.cdll.LoadLibrary(ObjectFile)
+    succ = lib.sumbins(nargs, argv)
+
+    print("Sum of particle masses: ", np.sum(pt_mass))
+    print("Sum of binned masses:   ", np.sum(mass_binned))
+
+
+    return mass_binned
+    """
