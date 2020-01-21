@@ -22,16 +22,16 @@ class ReaderBase:
         if units_name == 'data':
             data_to_other = 1
         elif units_name == 'clean':
-            data_to_other = self.get_clean_factor(self, dataset_name)
+            data_to_other = self.get_clean_factor(dataset_name)
         elif units_name == 'astro':
-            data_to_other = (self.get_clean_factor(self, dataset_name)
-                             * self.get_astro_factor(self, dataset_name))
+            data_to_other = (self.get_clean_factor(dataset_name)
+                             * self.get_astro_factor(dataset_name))
         elif units_name == 'cgs':
-            data_to_other = (self.get_clean_factor(self, dataset_name)
-                             * self.get_cgs_factor(self, dataset_name))
+            data_to_other = (self.get_clean_factor(dataset_name)
+                             * self.get_cgs_factor(dataset_name))
         elif units_name == 'si':
-            data_to_other = (self.get_clean_factor(self, dataset_name)
-                             * self.get_si_factor(self, dataset_name))
+            data_to_other = (self.get_clean_factor(dataset_name)
+                             * self.get_si_factor(dataset_name))
         else:
             print(f"Unknown unit system requested: '{units_name}'!")
             set_trace()
