@@ -3,6 +3,7 @@
 import numpy as np
 import h5py as h5
 import hydrangea.tools as ht
+import hydrangea.units as hu
 import hydrangea.hdf5 as hd
 
 from pdb import set_trace  # [Will be used later]
@@ -15,6 +16,69 @@ class ReaderBase:
     astronomical units, on-the-fly luminosity calculation, and
     cross-matching of particle IDs to subhalo catalogues.
     """
+
+    def get_unit_conversion(self, dataset_name, units_name):
+        """Get appropriate factor to convert data units to other system."""
+        if units_name == 'data':
+            data_to_other = 1
+        elif units_name == 'clean':
+            data_to_other = self.get_clean_factor(self, dataset_name)
+        elif units_name == 'astro':
+            data_to_other = (self.get_clean_factor(self, dataset_name)
+                             * self.get_astro_factor(self, dataset_name))
+        elif units_name == 'cgs':
+            data_to_other = (self.get_clean_factor(self, dataset_name)
+                             * self.get_cgs_factor(self, dataset_name))
+        elif units_name == 'si':
+            data_to_other = (self.get_clean_factor(self, dataset_name)
+                             * self.get_si_factor(self, dataset_name))
+        else:
+            print(f"Unknown unit system requested: '{units_name}'!")
+            set_trace()
+
+        return data_to_other
+
+    def get_clean_factor(self, dataset_name):
+        """Get the conversion factor to 'clean data units' (no h or a)."""
+        f = h5.File(self.file_name, 'r')
+        dSet = f[self.base_group + '/' + dataset_name]
+
+        try:
+            hscale_exponent = dSet.attrs["h-scale-exponent"]
+            ascale_exponent = dSet.attrs["aexp-scale-exponent"]
+
+            header = f["/Header"]
+            aexp = header.attrs["ExpansionFactor"]
+            h_hubble = header.attrs["HubbleParam"]
+        except(KeyError):
+            f.close()
+            return None
+        return aexp**ascale_exponent * h_hubble**hscale_exponent
+
+    def get_astro_factor(self, dataset_name):
+        """Get the conversion factor to 'astronomical units'."""
+        data_to_cgs_factor = self.get_cgs_factor(self, dataset_name)
+        if data_to_cgs_factor is None:
+            return None
+
+        dimensions = hu.get_dimensions(self.base_group, dataset_name)
+        cgs_to_astro_factor = (hu.si_to_astro_factor(dimensions)
+                               / hu.si_to_cgs_factor(dimensions))
+        return data_to_cgs_factor * cgs_to_astro_factor
+
+    def get_cgs_factor(self, dataset_name):
+        """Get the conversion factor to CGS units (boo, hiss)."""
+        return hd.read_attribute(self.file_name, dataset_name, 'CGS_Factor')
+
+    def get_si_factor(self, dataset_name):
+        """Get the conversion factor to SI units."""
+        data_to_cgs_factor = self.get_cgs_factor(self, dataset_name)
+        if data_to_cgs_factor is None:
+            return None
+
+        dimensions = hu.get_dimensions(self.base_group, dataset_name)
+        cgs_to_si_factor = 1 / hu.si_to_cgs_factor(dimensions)
+        return data_to_cgs_factor * cgs_to_si_factor
 
     def get_astro_conv(self, dataset_name):
         """Get the conversion factor to astronomical units for a data set.
@@ -83,7 +147,7 @@ class ReaderBase:
                 print("*** Looks like you are trying to load m_dm for "
                       "non-snapshot! ***")
                 set_trace()
-            self._m_dm = ht.get_m_dm(self.file_name, astro=self.astro)
+            self._m_dm = ht.get_m_dm(self.file_name, units=self.units)
         return self._m_dm
 
     @property
@@ -94,7 +158,7 @@ class ReaderBase:
                 print("*** Looks like you are trying to load m_baryon for "
                       "non-snapshot! ***")
                 set_trace()
-            self.m_baryon = ht.get_m_baryon(self.file_name, astro=self.astro)
+            self.m_baryon = ht.get_m_baryon(self.file_name, units=self.units)
         return self._m_baryon
 
 
