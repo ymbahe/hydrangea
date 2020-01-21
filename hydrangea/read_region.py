@@ -534,7 +534,10 @@ class ReadRegion(ReaderBase):
         # Need to explicitly set 'exact = False' here, because we have not
         # yet set up exact loading (we are doing it right now!).
         # Set astro=False because self.coordinates is in code units here.
-        pt_coords = self.read_data("Coordinates", exact=False, astro=False)
+        pt_coords = self.read_data("Coordinates", exact=False, astro=False,
+                                   store=None)
+        if self.astro:
+            self.Coordinates *= self.get_astro_conv("Coordinates")
         rel_pos = pt_coords - anchor[None, :]
 
         if self.shape == 'sphere':
