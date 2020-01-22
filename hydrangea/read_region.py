@@ -50,8 +50,8 @@ class ReadRegion(ReaderBase):
     when the sub-selection contains more than 40% of the full catalogue.
     """
 
-    def __init__(self, file_name, part_type, coordinates, shape=None,
-                 anchor=None, verbose=1, exact=False, units='astro',
+    def __init__(self, file_name, part_type, anchor, size, shape=None,
+                 anchor_style='centre', verbose=1, exact=False, units='astro',
                  coordinate_units=None,
                  read_units=None, map_file=None, periodic=False, 
                  load_full=False, join_threshold=100, bridge_threshold=100, 
@@ -81,10 +81,10 @@ class ReadRegion(ReaderBase):
             The shape of the region to read from. Valid options are 'sphere',
             'cube', or 'box' (capitalized versions also accepted). If None
             (default), a sphere is used.
-        anchor : string, optional
+        anchor_style : string, optional
             If 'bottom', the 'centre' coordinates for cube and box shapes are
             interpreted instead as the minimum x, y, z coordinates, and the
-            length(s) as full side length. If 'centre' or None (default), they
+            length(s) as full side length. If 'centre' (default), they
             specify the centre instead, as described above. This parameter
             has no effect when a sphere is selected as shape.
         verbose : int, optional
@@ -123,11 +123,12 @@ class ReadRegion(ReaderBase):
         self.file_name = file_name
         self.pt_num = part_type
         self.base_group = "PartType{:d}" .format(part_type)
-        self.coordinates = np.array(coordinates, dtype=float)
+        self.coordinates = np.array([*anchor, size], dtype=float)
         self.verbose = verbose
         self.exact = exact
         self.load_full = load_full
         self.periodic = periodic
+        self.anchor_style = anchor_style
 
         if read_units is None:
             read_units = units
@@ -145,17 +146,19 @@ class ReadRegion(ReaderBase):
                   .format(shape))
             set_trace()
 
-        if anchor is None:
-            self.anchor = 'centre'
-        else:
-            self.anchor = anchor
-
         # Set up map file, and check whether it exists
         if map_file is None:
             map_file = os.path.dirname(file_name) + '/ParticleMap.hdf5'
         if not os.path.exists(map_file):
             self._print(1, "Could not find particle map -- load everything.")
             self.load_full = True
+
+        # Convert input coordinates to code, if necessary
+        # N.B.: does not modify input array outside of function
+        if coordinate_units != 'data':
+            conv_input = self.get_unit_conversion('Coordinates',
+                                                  coordinate_units)
+            self.coordinates /= conv_input
 
         # If we need to load everything, we can quit now
         if self.load_full:
@@ -164,13 +167,6 @@ class ReadRegion(ReaderBase):
             if exact:
                 self._find_exact_region()
             return
-
-        # Convert input coordinates to code, if necessary
-        # N.B.: does not modify input array outside of function
-        if coordinate_units != 'data':
-            conv_input = self.get_unit_conversion('Coordinates',
-                                                  coordinate_units)
-            self.coordinates /= conv_input
 
         # Do the actual work of finding segments to be loaded
         self._setup_region(map_file, join_threshold, bridge_threshold,
@@ -582,12 +578,7 @@ class ReadRegion(ReaderBase):
         # Need to explicitly set 'exact = False' here, because we have not
         # yet set up exact loading (we are doing it right now!).
         # Coordinates are in data units here, so need to be consistent.
-        pt_coords = self.read_data("Coordinates", exact=False, units='data',
-                                   store=None)
-
-        # Set data units because self.coordinates is in data units here.
-        self.Coordinates *= self.get_unit_conversion('Coordinates',
-                                                     self.read_units)
+        pt_coords = self.read_data("Coordinates", exact=False, units='data')
         rel_pos = pt_coords - anchor[None, :]
 
         if self.shape == 'sphere':
@@ -595,7 +586,7 @@ class ReadRegion(ReaderBase):
             self.ind_sel = np.nonzero(rel_rad <= self.coordinates[3])[0]
 
         elif self.shape == 'cube':
-            if self.anchor == 'bottom':
+            if self.anchor_style == 'bottom':
                 self.ind_sel = np.nonzero(
                     (np.min(rel_pos, axis=1) >= 0) &
                     (np.max(rel_pos, axis=1) <= self.coordinates[3]))[0]
@@ -605,7 +596,7 @@ class ReadRegion(ReaderBase):
 
         elif self.shape == 'box':
             length = self.coordinates[3:]
-            if self.anchor == 'bottom':
+            if self.anchor_style == 'bottom':
                 self.ind_sel = np.nonzero(
                     (np.min(rel_pos, axis=1) >= 0) &
                     (np.max(rel_pos - length[None, :]) <= 0))[0]
@@ -617,6 +608,12 @@ class ReadRegion(ReaderBase):
             set_trace()
 
         self.num_particles_exact = len(self.ind_sel)
+
+        # Store coordinates, in correct units.
+        self.Coordinates = (
+            pt_coords[self.ind_sel, ...]
+            * self.get_unit_conversion('Coordinates',
+                                       self.read_units))
 
     def _make_selection_box(self):
         """
@@ -650,7 +647,7 @@ class ReadRegion(ReaderBase):
             # Set up of lower box corner differs depending on anchor type
             box[:, 0] = coordinates[:3]
             box[:, 1] = coordinates[:3] + coordinates[3]
-            if self.anchor == 'centre':
+            if self.anchor_style == 'centre':
                 box[:, 0] -= coordinates[3]
 
         elif self.shape == "box":
@@ -660,15 +657,15 @@ class ReadRegion(ReaderBase):
                       "lengths (3)")
                 set_trace()
 
-            if self.anchor == 'centre':
+            if self.anchor_style == 'centre':
                 box[:, 0] = coordinates[:3] - coordinates[3:]
                 box[:, 1] = coordinates[:3] + coordinates[3:]
-            elif self.anchor == 'bottom':
+            elif self.anchor_style == 'bottom':
                 box[:, 0] = coordinates[:3]
                 box[:, 1] = coordinates[3:]
             else:
-                print("Unrecognised anchor choice '{:s}'"
-                      .format(self.anchor))
+                print("Unrecognised anchor_style choice '{:s}'"
+                      .format(self.anchor_style))
                 set_trace()
 
         else:
