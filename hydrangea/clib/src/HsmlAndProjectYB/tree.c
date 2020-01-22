@@ -314,11 +314,6 @@ void tree_update_node_recursive(int no, int sib, int father)
 }
 
 
-
-
-
-
-
 int ngb_compare_key(const void *a, const void *b)
 {
   if(((struct r2data *) a)->r2 < (((struct r2data *) b)->r2))
@@ -331,59 +326,42 @@ int ngb_compare_key(const void *a, const void *b)
 }
 
 
-float ngb_treefind(MyFloat xyz[3], int desngb, float hguess)
-{
+float ngb_treefind(MyFloat xyz[3], int desngb, float hguess) {
   int numngb, iter;
   float h2max;
 
   if(hguess == 0)
-    {
-      hguess = Hmax/100;
-    }
+    hguess = Hmax/100;
   
   iter = 0;
+  do {
+    iter++;
+    numngb = ngb_treefind_variable(xyz, hguess);
+    
+    if(numngb < desngb) {
+      if(hguess < Hmax) {
+	hguess *= 1.26;
+	continue;
+      }
+      else
+	/* So we still haven't reached desngb, but are already at Hmax. */
+	/* We can stop! */
+	return(Hmax);
 
-  do
-    {
-
-      iter++;
-      
-      /*      printf("   iter=%d, hguess= %g (Hmax=%g)\n", iter, hguess, Hmax); */
-      numngb = ngb_treefind_variable(xyz, hguess);
-      /*printf("   ...numngb=%d\n", numngb); */
-       
-      if(numngb < desngb)
-	{
-	  if(hguess < Hmax) {
-	    hguess *= 1.26;
-	    continue;
-	  }
-	  else {
-	    /* So we still haven't reached desngb, but are already at Hmax. */
-	    /* We can stop! */
-
-	    return(Hmax);
-	    
-	  }
-	
-	} else {
-
-	qsort(R2list, numngb, sizeof(struct r2data), ngb_compare_key);
-	  h2max = R2list[desngb - 1].r2;
-	  break;
-	}
-
-      hguess *= 1.26;
-
+    } else {
+      qsort(R2list, numngb, sizeof(struct r2data), ngb_compare_key);
+      h2max = R2list[desngb - 1].r2;
+      break;
     }
+    hguess *= 1.26;
+  }
   while(1);
 
   return sqrt(h2max);
 }
 
 
-int ngb_treefind_variable(MyFloat searchcenter[3], float hguess)
-{
+int ngb_treefind_variable(MyFloat searchcenter[3], float hguess) {
   int numngb, no, p;
   double dx, dy, dz, r2, h2;
   struct NODE *this;
@@ -393,75 +371,58 @@ int ngb_treefind_variable(MyFloat searchcenter[3], float hguess)
   numngb = 0;
   no = NumPart;
 
-  while(no >= 0)
-    {
-      if(no < NumPart)		/* single particle */
-	{
-	  p = no;
-	  no = Nextnode[no];
+  while(no >= 0) {
+    if(no < NumPart) {		/* single particle */
+      p = no;
+      no = Nextnode[no];
 
-	  dx = NEAREST(P[p].Pos[0] - searchcenter[0]);
-	  if(dx < -hguess)
-	    continue;
-	  if(dx > hguess)
-	    continue;
+      dx = NEAREST(P[p].Pos[0] - searchcenter[0]);
+      if(dx < -hguess)
+	continue;
+      if(dx > hguess)
+	continue;
+      
+      dy = NEAREST(P[p].Pos[1] - searchcenter[1]);
+      if(dy < -hguess)
+	continue;
+      if(dy > hguess)
+	continue;
+      
+      dz = NEAREST(P[p].Pos[2] - searchcenter[2]);
+      if(dz < -hguess)
+	continue;
+      if(dz > hguess)
+	continue;
+      
+      r2 = dx * dx + dy * dy + dz * dz;
 
-	  dy = NEAREST(P[p].Pos[1] - searchcenter[1]);
-	  if(dy < -hguess)
-	    continue;
-	  if(dy > hguess)
-	    continue;
+      if(r2 < h2) {
+	R2list[numngb].r2 = r2;
+	R2list[numngb].index = p;
+	numngb++;
+      }
+    } else {
+      this = &Nodes[no];
+      no = Nodes[no].u.d.sibling;     /* in case the node can be discarded */
 
-	  dz = NEAREST(P[p].Pos[2] - searchcenter[2]);
-	  if(dz < -hguess)
-	    continue;
-	  if(dz > hguess)
-	    continue;
+      if((NEAREST(this->center[0] - searchcenter[0]) + 0.5 * this->len) < -hguess)
+	continue;
+      if((NEAREST(this->center[0] - searchcenter[0]) - 0.5 * this->len) > hguess)
+	continue;
+      if((NEAREST(this->center[1] - searchcenter[1]) + 0.5 * this->len) < -hguess)
+	continue;
+      if((NEAREST(this->center[1] - searchcenter[1]) - 0.5 * this->len) > hguess)
+	continue;
+      if((NEAREST(this->center[2] - searchcenter[2]) + 0.5 * this->len) < -hguess)
+	continue;
+      if((NEAREST(this->center[2] - searchcenter[2]) - 0.5 * this->len) > hguess)
+	continue;
 
-	  r2 = dx * dx + dy * dy + dz * dz;
-
-	  if(r2 < h2)
-	    {
-	      R2list[numngb].r2 = r2;
-	      R2list[numngb].index = p;
-	      numngb++;
-	    }
-	}
-      else
-	{
-	  this = &Nodes[no];
-
-	  no = Nodes[no].u.d.sibling;	/* in case the node can be discarded */
-
-	  if((NEAREST(this->center[0] - searchcenter[0]) + 0.5 * this->len) < -hguess)
-	    continue;
-	  if((NEAREST(this->center[0] - searchcenter[0]) - 0.5 * this->len) > hguess)
-	    continue;
-	  if((NEAREST(this->center[1] - searchcenter[1]) + 0.5 * this->len) < -hguess)
-	    continue;
-	  if((NEAREST(this->center[1] - searchcenter[1]) - 0.5 * this->len) > hguess)
-	    continue;
-	  if((NEAREST(this->center[2] - searchcenter[2]) + 0.5 * this->len) < -hguess)
-	    continue;
-	  if((NEAREST(this->center[2] - searchcenter[2]) - 0.5 * this->len) > hguess)
-	    continue;
-
-	  no = this->u.d.nextnode;	/* ok, we need to open the node */
-	}
+      no = this->u.d.nextnode;	/* ok, we need to open the node */
     }
-
-  /*
-     printf("numngb=%d\n", numngb);
-   */
+  }
   return numngb;
 }
-
-
-
-
-
-
-
 
 /* this function allocates memory used for storage of the tree
  * and auxiliary arrays for tree-walk and link-lists.
