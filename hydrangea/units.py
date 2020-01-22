@@ -57,6 +57,7 @@ DIM_MOMENT_OF_INERTIA = 'MomentOfInertia'
 DIM_TEMPERATURE = 'Temperature'
 DIM_DENSITY = 'Density'
 DIM_ENTROPY = 'Entropy'
+DIM_PRESSURE = 'Pressure'
 
 
 # -------------------
@@ -76,6 +77,7 @@ CGS_UNITS = {
     DIM_TEMPERATURE: KELVIN,
     DIM_DENSITY: GRAM / CM**3,
     DIM_ENTROPY: GRAM**(1-GAMMA) * CM**(3*GAMMA-1) * S**(-2),
+    DIM_PRESSURE: GRAM / (CM * S**2)
     }
 
 ASTRO_UNITS = {
@@ -91,6 +93,7 @@ ASTRO_UNITS = {
     DIM_TEMPERATURE: KELVIN,
     DIM_DENSITY: PROTON_MASS / CM**3,
     DIM_ENTROPY: GRAM**(1-GAMMA) * CM**(3*GAMMA-1) * S**(-2),
+    DIM_PRESSURE: KG / (M * S**2)
     }
 
 
@@ -174,11 +177,29 @@ FOF_DIMENSIONS = {
 
 PARTICLE_DIMENSIONS = {
     'AExpMaximumTemperature': None,
+    'BH_AccretionLength': DIM_LENGTH,
+    'BH_CumlAccrMass': DIM_MASS,
+    'BH_CumlNumSeeds': None,
+    'BH_Density': DIM_DENSITY,
+    'BH_EnergyReservoir': DIM_ENERGY,
+    'BH_FormationTime': None,
+    'BH_Mass': DIM_MASS,
+    'BH_Mdot': DIM_MASS_RATE,
+    'BH_MostMassiveProgenitorID': None,
+    'BH_Pressure': DIM_PRESSURE,
+    'BH_SoundSpeed': DIM_VELOCITY,
+    'BH_SurroundingGasVel': DIM_VELOCITY,
+    'BH_TimeLastMerger': None,
+    'BH_WeightedDensity': DIM_DENSITY,
+    'BirthDensity': DIM_DENSITY,
     'Coordinates': DIM_LENGTH,
     'Density': DIM_DENSITY,
-    'Entroyp': DIM_ENTROPY,
+    'Entropy': DIM_ENTROPY,
+    'Feedback_EnergyFraction': None,
     'GroupNumber': None,
+    'HostHalo_TVir': DIM_TEMPERATURE,
     'HostHalo_TVir_Mass': DIM_TEMPERATURE,
+    'InitialMass': DIM_MASS,
     'InternalEnergy': DIM_ENERGY,
     'IronMassFracFromSNIa': None,
     'Mass': DIM_MASS,
@@ -190,9 +211,12 @@ PARTICLE_DIMENSIONS = {
     'Metallicity': None,
     'OnEquationOfState': None,
     'ParticleIDs': None,
+    'PreviousStellarEnrichment': None,
     'SmoothedIronMassFracFromSNIa': None,
     'SmoothedMetallicity': None,
     'SmoothingLength': DIM_LENGTH,
+    'StellarEnrichmentCounter': None,
+    'StellarFormationTime': None,
     'StarFormationRate': DIM_MASS_RATE,
     'Temperature': DIM_TEMPERATURE,
     'TotalMassFromAGB': DIM_MASS,
