@@ -52,6 +52,7 @@ class ReadRegion(ReaderBase):
 
     def __init__(self, file_name, part_type, coordinates, shape=None,
                  anchor=None, verbose=1, exact=False, units='astro',
+                 coordinate_units=None,
                  read_units=None, map_file=None, periodic=False, 
                  load_full=False, join_threshold=100, bridge_threshold=100, 
                  bridge_gap=0.5):
@@ -94,8 +95,12 @@ class ReadRegion(ReaderBase):
             (default), typically also some particles slightly outside the
             selected region are loaded.
         units : str, optional
+            Shorthand to set both coordinate_units and read_units to
+            same value (default: 'astro')
+        coordinate_units : str or None, optional
             Unit system in which to interpret the supplied coordinates.
-            Default is 'astro' (--> lengths in pMpc); alternatives are
+            If None (default), the same as <units> is used. 
+            (--> lengths in pMpc); alternatives are
             'data' (as in file), 'clean' (as in file, with a and h factors
             removed), 'cgs', or 'SI'.
         read_units : str or None, optional
@@ -124,6 +129,12 @@ class ReadRegion(ReaderBase):
         self.load_full = load_full
         self.periodic = periodic
 
+        if read_units is None:
+            read_units = units
+        if coordinate_units is None:
+            coordinate_units = units
+        self.read_units = read_units
+
         # Deal with different shape inputs
         if shape is None:
             self.shape = 'sphere'
@@ -148,11 +159,17 @@ class ReadRegion(ReaderBase):
 
         # If we need to load everything, we can quit now
         if self.load_full:
+            self.num_particles = hdf5.read_attribute(
+                file_name, 'Header', 'NumPart_Total')[part_type]
+            if exact:
+                self._find_exact_region()
             return
 
         # Convert input coordinates to code, if necessary
-        if units != 'data':
-            conv_input = self.get_unit_conversion('Coordinates', units)
+        # N.B.: does not modify input array outside of function
+        if coordinate_units != 'data':
+            conv_input = self.get_unit_conversion('Coordinates',
+                                                  coordinate_units)
             self.coordinates /= conv_input
 
         # Do the actual work of finding segments to be loaded
@@ -161,6 +178,10 @@ class ReadRegion(ReaderBase):
 
         # If we'd have to load too many cells, just load everything
         if self.load_full:
+            self.num_particles = hdf5.read_attribute(
+                file_name, 'Header', 'NumPart_Total')[part_type]
+            if exact:
+                self._find_exact_region()
             return
 
         self._print(1, "Region setup took {:.3f} sec."
@@ -170,6 +191,9 @@ class ReadRegion(ReaderBase):
                     .format(self.num_cells, self.num_segments,
                             self.num_particles, len(np.unique(self.files))))
         self._print(2, "  (selected files:", np.unique(self.files), ")")
+        if exact:
+            self._print(1, f'Exact selection region contains '
+                        f'{self.num_particles_exact} particles.')
 
         # If we'd have to load almost all particles, load everything
         if self.num_particles >= self.num_part_total * 0.75:
@@ -180,9 +204,9 @@ class ReadRegion(ReaderBase):
 
     # -----------------------------------------------------------------------
 
-    def read_data(self, dataset_name, units='astro', verbose=None, exact=None,
-                  file_name=None, pt_name=None, single_file=False, 
-                  store=False, trial=False):
+    def read_data(self, dataset_name, units=None, verbose=None, exact=None,
+                  file_name=None, pt_name=None, single_file=False,
+                  store=False, trial=False, data_type=None):
         """
         Read a specified dataset for a previously set up region.
 
@@ -192,14 +216,11 @@ class ReadRegion(ReaderBase):
             The dataset to read from, including groups where appropriate.
             The leading 'PartType[x]' must however *not* be included!
 
-        units : str, optional
-            Convert values to other units (default: 'astro'). With 'data',
-            no conversion is done.
+        units : str or None, optional
+            Convert values to other units (default: class <read_units>).
+            With 'data', no conversion is done.
         verbose : int, optional
             Frequency of log messages. If None (default), use class value.
-        return_conv : bool, optional
-            Return a list of [data, conv_astro], where conv_astro
-            is the conversion factor internal-->astro (default: False).
         exact : bool, optional
             Only return data for particles lying in the exact specified
             selection region. Defaults to the class init value.
@@ -221,12 +242,15 @@ class ReadRegion(ReaderBase):
             Attempt to read the data set. If it does not yield the
             expected number of elements for any one file or total,
             return None. If False (default), enter debug mode in this case.
+        data_type : str, optional
+            Store read data in an array of this data type. If None
+            (default), this is determined from the HDF5 data set.
 
         Returns
         -------
         data : array
             The data read for the particles in the selected region.
- 
+
         Note
         ----
         The selection of which particles to load has already been taken
@@ -250,6 +274,9 @@ class ReadRegion(ReaderBase):
 
         full_dataset_name = pt_name + '/' + dataset_name
 
+        if units is None:
+            units = self.read_units
+
         # Deal with special case of loading the full particle catalogue
         if self.load_full:
             if single_file:
@@ -258,15 +285,26 @@ class ReadRegion(ReaderBase):
                     conv_fac = self.get_unit_conversion(dataset_name, units)
                     if conv_fac is not None and conv_fac != 1:
                         data_full *= conv_fac
-                return data_full
-
             else:
-                return SplitFile(file_name, pt_name).read_data(
+                data_full = SplitFile(file_name, pt_name).read_data(
                     dataset_name, units=units)
+
+            if exact:
+                data_full = data_full[self.ind_sel, ...]
+
+            # Store the array directly in the object, if desired
+            if store is not False:
+                if store is None:
+                    store = dataset_name.replace('/', '__')
+                setattr(self, store, data_full)
+
+            self._print((1, verbose), "Reading '{:s}' took {:.3f} sec."
+                        .format(dataset_name, time.time() - stime))
+            return data_full
 
         # Deal with pathological case of no data to load:
         if self.num_segments == 0:
-            return np.zeros(0, dtype = int)
+            return np.zeros(0, dtype=int)
 
         # -------------------------------------------------------------
         # Rest is for 'default' situation of reading via segment list.
@@ -294,15 +332,15 @@ class ReadRegion(ReaderBase):
             dSet = f[full_dataset_name]
         except KeyError:
             if trial:
-                if return_conv:
-                    return None, None
-                else:
-                    return None
+                return None
             print("Could not load data set, please investigate.")
             set_trace()
+
         full_shape = list(dSet.shape)      # Cannot assign to tuple ==> list
         full_shape[0] = self.num_particles
-        data_full = np.empty(full_shape, dSet.dtype)
+        if data_type is None:
+            data_type = dSet.dtype
+        data_full = np.empty(full_shape, data_type)
 
         # Get unit conversion factor
         conv_factor = self.get_unit_conversion(dataset_name, units)
@@ -549,7 +587,7 @@ class ReadRegion(ReaderBase):
 
         # Set data units because self.coordinates is in data units here.
         self.Coordinates *= self.get_unit_conversion('Coordinates',
-                                                     self.units)
+                                                     self.read_units)
         rel_pos = pt_coords - anchor[None, :]
 
         if self.shape == 'sphere':

@@ -13,32 +13,68 @@ class ReaderBase:
     """Base for reading classes (SplitFile and ReadRegion).
 
     It contains common functionality, in particular conversion to
-    astronomical units, on-the-fly luminosity calculation, and
-    cross-matching of particle IDs to subhalo catalogues.
+    specified unit systems and cross-matching of particle IDs to
+    subhalo catalogues.
     """
 
     def get_unit_conversion(self, dataset_name, units_name):
-        """Get appropriate factor to convert data units to other system."""
-        if units_name == 'data':
+        """Get appropriate factor to convert data units to other system.
+
+        Parameters
+        ----------
+        dataset_name : str
+            The name of the data set for which to obtain the conversion
+            factor (including possible containing groups, but not the
+            base group).
+        units_name : str
+            The unit system to calculate the conversion factor for.
+            Options are (case-insensitive):
+                'data' --> Exactly as stored in file (i.e. no conversion)
+                'clean' --> As in file, but without `a' and `h' factors
+                'astro' --> Astronomically useful units (e.g. M_Sun, pMpc)
+                'si' --> SI units
+                'cgs' --> CGS units
+
+        Returns
+        -------
+        data_to_other : float
+            The conversion factor for the specified unit system.
+            The 'raw' data as read from the file(s) must be multiplied
+            with this value to obtain the magnitude in the target system.
+
+        Note
+        ----
+        In particular in SI and CGS units, overflow issues may occur for
+        32-bit floats, because these have a maximum value of ~1e39.
+
+        Examples
+        --------
+        import hydrangea as hy
+        snap_file = hy.objects.Simulation(index=0).get_snap_file(29)
+        stars = hy.SplitFile(snap_file, part_type=4)
+        stars.get_unit_conversion('Mass', 'astro')
+        >>> 14755791648.22193
+
+        stars.get_unit_conversion('CentreOfPotential', 'SI')
+        >>> 4.553162166150214e+22
+        """
+        if units_name.lower() == 'data':
             data_to_other = 1
-        elif units_name == 'clean':
-            data_to_other = self.get_clean_factor(dataset_name)
-        elif units_name == 'astro':
-            data_to_other = (self.get_clean_factor(dataset_name)
-                             * self.get_astro_factor(dataset_name))
-        elif units_name == 'cgs':
-            data_to_other = (self.get_clean_factor(dataset_name)
-                             * self.get_cgs_factor(dataset_name))
-        elif units_name == 'si':
-            data_to_other = (self.get_clean_factor(dataset_name)
-                             * self.get_si_factor(dataset_name))
+        elif units_name.lower() == 'clean':
+            data_to_other = self.get_data_to_clean_factor(dataset_name)
+        elif units_name.lower() == 'astro':
+            data_to_other = self.get_data_to_astro_factor(dataset_name)
+        elif units_name.lower() == 'cgs':
+            data_to_other = self.get_data_to_cgs_factor(dataset_name)
+        elif units_name.lower() == 'si':
+            data_to_other = self.get_data_to_si_factor(dataset_name)
         else:
             print(f"Unknown unit system requested: '{units_name}'!")
             set_trace()
 
         return data_to_other
 
-    def get_clean_factor(self, dataset_name):
+    def get_data_to_clean_factor(self, dataset_name):
         """Get the conversion factor to 'clean data units' (no h or a)."""
         f = h5.File(self.file_name, 'r')
         dSet = f[self.base_group + '/' + dataset_name]
@@ -55,30 +91,50 @@ class ReaderBase:
             return None
         return aexp**ascale_exponent * h_hubble**hscale_exponent
 
-    def get_astro_factor(self, dataset_name):
-        """Get the conversion factor to 'astronomical units'."""
-        data_to_cgs_factor = self.get_cgs_factor(self, dataset_name)
-        if data_to_cgs_factor is None:
-            return None
-
-        dimensions = hu.get_dimensions(self.base_group, dataset_name)
-        cgs_to_astro_factor = (hu.si_to_astro_factor(dimensions)
-                               / hu.si_to_cgs_factor(dimensions))
-        return data_to_cgs_factor * cgs_to_astro_factor
-
-    def get_cgs_factor(self, dataset_name):
+    def get_data_to_cgs_factor(self, dataset_name):
         """Get the conversion factor to CGS units (boo, hiss)."""
-        return hd.read_attribute(self.file_name, dataset_name, 'CGS_Factor')
+        data_to_clean_factor = self.get_data_to_clean_factor(dataset_name)
+        if data_to_clean_factor is None:
+            return None
 
-    def get_si_factor(self, dataset_name):
-        """Get the conversion factor to SI units."""
-        data_to_cgs_factor = self.get_cgs_factor(self, dataset_name)
+        return (hd.read_attribute(self.file_name,
+                                  self.base_group + '/' + dataset_name,
+                                  'CGSConversionFactor')
+                * data_to_clean_factor)
+
+    def get_data_to_astro_factor(self, dataset_name):
+        """Get conversion factor from data to astro."""
+        data_to_cgs_factor = self.get_data_to_cgs_factor(dataset_name)
         if data_to_cgs_factor is None:
             return None
 
+        cgs_to_astro_factor = self.get_cgs_to_astro_factor(dataset_name)
+        if cgs_to_astro_factor is None:
+            return None
+        else:
+            return data_to_cgs_factor * cgs_to_astro_factor
+
+    def get_data_to_si_factor(self, dataset_name):
+        """Get conversion factor from data to SI."""
+        data_to_cgs_factor = self.get_data_to_cgs_factor(dataset_name)
+        if data_to_cgs_factor is None:
+            return None
+
+        cgs_to_si_factor = self.get_cgs_to_si_factor(dataset_name)
+        if cgs_to_si_factor is None:
+            return None
+        else:
+            return data_to_cgs_factor * cgs_to_si_factor
+
+    def get_cgs_to_astro_factor(self, dataset_name):
+        """Get the conversion factor from CGS to 'astronomical units'."""
         dimensions = hu.get_dimensions(self.base_group, dataset_name)
-        cgs_to_si_factor = 1 / hu.si_to_cgs_factor(dimensions)
-        return data_to_cgs_factor * cgs_to_si_factor
+        return hu.get_unit_conversion_factor(dimensions, 'cgs', 'astro')
+
+    def get_cgs_to_si_factor(self, dataset_name):
+        """Get the conversion factor from CGS to SI units."""
+        dimensions = hu.get_dimensions(self.base_group, dataset_name)
+        return hu.get_unit_conversion_factor(dimensions, 'cgs', 'si')
 
     def get_astro_conv(self, dataset_name):
         """Get the conversion factor to astronomical units for a data set.
@@ -160,7 +216,6 @@ class ReaderBase:
                 set_trace()
             self.m_baryon = ht.get_m_baryon(self.file_name, units=self.units)
         return self._m_baryon
-
 
     def get_time(self, timeType='aexp'):
         """Retrieve various possible time stamps of the output.

@@ -19,7 +19,9 @@ MEGAPARSEC = MPC = 1e6 * PARSEC
 # Masses
 GRAM = 1e-3
 KILOGRAM = KG = 1
-SOLAR_MASS = MSUN = 1.98847e30
+#SOLAR_MASS = MSUN = 1.98847e30
+SOLAR_MASS = MSUN = 1.989e30
+
 PROTON_MASS = MP = 1.6726219e-27
 
 # Times
@@ -238,10 +240,46 @@ def get_dimensions(base_group, dataset_name):
         return None
 
 
+def get_unit_conversion_factor(dimension, system1, system2):
+    """Get the conversion factor for a dimension from unit system 1 to 2.
+
+    This is the number that values in system 1 must be multiplied with
+    to convert them to system 2.
+    """
+    if dimension is None:
+        return None
+
+    try:
+        if system1.lower() == 'si':
+            system1_to_si = 1
+        elif system1.lower() == 'cgs':
+            system1_to_si = CGS_UNITS[dimension]
+        elif system1.lower() == 'astro':
+            system1_to_si = ASTRO_UNITS[dimension]
+        else:
+            print(f"Unsupported unit system {system1}!")
+            set_trace()
+
+        if system2.lower() == 'si':
+            system2_to_si = 1
+        elif system2.lower() == 'cgs':
+            system2_to_si = CGS_UNITS[dimension]
+        elif system2.lower() == 'astro':
+            system2_to_si = ASTRO_UNITS[dimension]
+        else:
+            print(f"Unsupported unit system {system2}!")
+            set_trace()
+    except KeyError:
+        print(f"Unknown dimension {dimension}!")
+        set_trace()
+
+    return system1_to_si / system2_to_si
+
+
 def si_to_astro_factor(dimension):
     """Find the conversion factor from CGS to astronomical."""
     try:
-        return ASTRO_UNITS['dimension']
+        return 1/ASTRO_UNITS[dimension]
     except KeyError:
         print(f"Unknown dimension '{dimension}'!")
         set_trace()
@@ -250,7 +288,8 @@ def si_to_astro_factor(dimension):
 def si_to_cgs_factor(dimension):
     """Find the conversion factor from CGS to SI."""
     try:
-        return CGS_UNITS['dimension']
+        return 1/CGS_UNITS[dimension]
     except KeyError:
         print(f"Unknown dimension '{dimension}'!")
         set_trace()
+

@@ -29,7 +29,7 @@ class SplitFile(ReaderBase):
     """
 
     def __init__(self, file_name, group_name=None, part_type=None,
-                 sim_type='Eagle', verbose=1, astro=True, read_range=None,
+                 sim_type='Eagle', verbose=1, units='astro', read_range=None,
                  read_index=None):
         """Initialize a file collection to read from.
 
@@ -51,8 +51,9 @@ class SplitFile(ReaderBase):
         verbose : int, optional
             Specify level of log output, from 0 (minimal) to 2 (lots).
             Default: 1.
-        astro : bool, optional
-            Default conversion behaviour (default: True).
+        units : str or None, optional
+            Convert values to other units (default: 'astro').
+            With 'data', no conversion is done.
         read_range : (int, int) or None, optional
             Read only elements from the first up to *but excluding* the
             second entry in the tuple. If None (default), load entire
@@ -72,7 +73,7 @@ class SplitFile(ReaderBase):
 
         """
         self.verbose = verbose
-        self.astro = astro
+        self.units = units
         self.read_index = read_index
         if read_index is None:
             self.read_range = read_range
@@ -100,8 +101,8 @@ class SplitFile(ReaderBase):
         self._print(1, "Prepared reading from '{:s}'..."
                     .format(self.base_group.upper()))
 
-    def read_data(self, dataset_name, verbose=None, astro=None,
-                  return_conv=False, store=False, trial=False):
+    def read_data(self, dataset_name, verbose=None, units=None,
+                  store=False, trial=False, data_type=None):
         """Read a specified data set from the file collection.
 
         Parameters
@@ -109,10 +110,8 @@ class SplitFile(ReaderBase):
         dataset_name : str
             The name of the data set to read, including possibly containing
             groups, but *not* the main group specified in the instantiation.
-        astro : bool or None, optional
-            Attempt conversion to `astronomical' units where necessary
-            (pMpc, 10^10 M_sun, km/s). This is ignored for dimensionless
-            quantities. Default: True
+        units : str or None, optional
+            Convert to other unit system (default: class init value).
         verbose : int, optional
             Provide more or less useful messages during reading.
             Default: 1 (minimal)
@@ -125,18 +124,17 @@ class SplitFile(ReaderBase):
             expected number of elements for any one file or total
             (or returns any elements in HAC mode), return None.
             If False (default), enter debug mode in this case.
+        data_type : dataType or None, optional
+            Read the data into an array of this data type. If None
+            (default), determine this from the HDF5 data set.
 
         Returns
         -------
         data : np.array
             Array containing the specified data.
-        astro_conv : float or None
-            Conversion factor to astronomical units; returned only if
-            return_conv is True.
-
         """
-        if astro is None:
-            astro = self.astro
+        if units is None:
+            units = self.units
         if verbose is None:
             verbose = self.verbose
 
@@ -150,15 +148,15 @@ class SplitFile(ReaderBase):
         if self.num_elem is not None:
             if self.file_offsets is not None:
                 data_out = self._read_files_direct(dataset_name,
-                                                   verbose, trial)
+                                                   verbose, trial, data_type)
                 need_to_truncate = False  # Done internally here
             else:
-                data_out = self._read_files_sequentially(dataset_name,
-                                                         verbose, trial)
+                data_out = self._read_files_sequentially(
+                    dataset_name, verbose, trial, data_type)
         else:
             # Use HAC if we don't know how many elements to read in total
             data_out = self._read_files_hac(dataset_name, trial,
-                                            verbose=verbose)
+                                            verbose, data_type)
 
         # Apply corrections if needed
         if data_out is not None:
@@ -172,10 +170,14 @@ class SplitFile(ReaderBase):
             elif self.read_index is not None:
                 ind_sel = self.read_index - self.read_range[0]
                 data_out = data_out[ind_sel, ...]
-            if astro or return_conv:
-                astro_conv = self.get_astro_conv(dataset_name)
-                if astro and astro_conv is not None and astro_conv != 1:
-                    data_out *= astro_conv
+            if units != 'data':
+                conv_factor = self.get_unit_conversion(dataset_name, units)
+                if conv_factor is not None and conv_factor != 1:
+                    try:
+                        data_out *= conv_factor
+                    except np.core._exceptions.UFuncTypeError:
+                        print("Unit conversion failed, please investigate.")
+                        set_trace()
 
         # Store the array directly in the object, if desired
         if store is not False:
@@ -183,12 +185,10 @@ class SplitFile(ReaderBase):
                 store = dataset_name.replace('/', '__')
             setattr(self, store, data_out)
 
-        if return_conv:
-            return data_out, astro_conv
-        else:
-            return data_out
+        return data_out
 
-    def _read_files_direct(self, dataset_name, verbose=1, trial=False):
+    def _read_files_direct(self, dataset_name, verbose=1, trial=False,
+                           data_type=None):
         """Read data set from files using pre-established offset list."""
         data_out = None
         for ifile in range(self.read_start[0], self.read_end[0]+1):
@@ -208,7 +208,7 @@ class SplitFile(ReaderBase):
             if num_exp > 0:
                 num_read, data_out = self._read_file(
                     ifile, dataset_name, data_out, read_range=[start, end],
-                    offset=write_offset, verbose=verbose)
+                    offset=write_offset, verbose=verbose, data_type=data_type)
                 if num_read != num_exp:
                     if trial:
                         return None
@@ -219,7 +219,7 @@ class SplitFile(ReaderBase):
         return data_out
 
     def _read_files_sequentially(self, dataset_name, verbose=1,
-                                 trial=False):
+                                 trial=False, data_type=None):
         """Read data from files in sequential order."""
         data_out = None
         offset = 0
@@ -227,7 +227,8 @@ class SplitFile(ReaderBase):
         # Read data into data_out, which is cycled through _read_file()
         for ifile in range(self.num_files):
             num_read, data_out = self._read_file(
-                ifile, dataset_name, data_out, offset=offset, verbose=verbose)
+                ifile, dataset_name, data_out, offset=offset, verbose=verbose,
+                data_type=data_type)
             offset += num_read
 
         # Make sure we read right total number
@@ -241,8 +242,8 @@ class SplitFile(ReaderBase):
         self._print((1, verbose), "")   # Ends no-newline sequence
         return data_out
 
-    def _read_files_hac(self, dataset_name, trial=False, threshold=int(1e9),
-                        verbose=1):
+    def _read_files_hac(self, dataset_name, trial=False, verbose=1,
+                        data_type=None, threshold=int(1e9)):
         """Read data set from files into output, using HAC."""
         data_out = None
         data_stack = None
@@ -250,7 +251,8 @@ class SplitFile(ReaderBase):
 
         for ifile in range(self.num_files):
             num, data_part = self._read_file(ifile, dataset_name, None,
-                                             self_only=True, verbose=verbose)
+                                             self_only=True, verbose=verbose,
+                                             data_type=data_type)
             if num == 0:
                 continue
 
@@ -282,7 +284,7 @@ class SplitFile(ReaderBase):
 
     def _read_file(self, ifile, dataset_name, data_out, offset=0,
                    verbose=1, read_range=None, num_out=None,
-                   self_only=False):
+                   self_only=False, data_type=None):
         """Read specified data set from one file into output.
 
         This is the low-level reading routine called by the three
@@ -310,6 +312,9 @@ class SplitFile(ReaderBase):
         self_only : bool, optional
             If output is internally initialized, only allocate enough
             elements for data from this file (default: False).
+        data_type : dataType or None, optional
+            Read data into an array of this data type. If None (default),
+            determine the type from the HDF5 data set.
 
         Returns
         -------
@@ -360,7 +365,9 @@ class SplitFile(ReaderBase):
                     shape[0] = self.num_elem
                 else:
                     shape[0] = num_out
-            data_out = np.empty(shape, dataSet.dtype)
+            if data_type is None:
+                data_type = dataSet.dtype
+            data_out = np.empty(shape, data_type)
         else:
             if read_range is None:
                 length = dataSet.len()
