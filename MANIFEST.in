@@ -1,0 +1,2 @@
+include hydrangea/OutputLists/*
+include hydrangea/clib/*.so
