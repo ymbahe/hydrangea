@@ -196,42 +196,18 @@ void print_usage_message(int nArg) {
 }
 
 
-void determine_hsml(void)
-{
+void determine_hsml(void) {
   int i;
-  double h = Hmax/100;  /* Just a semi-reasonable, semi-conservative starting guess */
+  double h = Hmax/100;  /* Semi-reasonable, semi-conservative starting guess */
 
-  /*  omp_set_num_threads(1); */
-  /*#pragma omp parallel for firstprivate(h, R2list) */
-  for(i = 0; i < NumPart; i++)
-    {
-      /*int signal = 0; */
-
-      if((i % (NumPart / 100)) == 0)
-	{
-	  printf("x");
-	  fflush(stdout);
-	}
-
-      /*
-      if(i > (signal / 100.0) * NumPart)
-        {
-          printf("x");
-          fflush(stdout);
-          signal++;
-        }
-      */
-
-      /*printf("Particle %d...\n", i); */
-      if(Hsml[i] == 0)
-	{
-	  Hsml[i] = h = ngb_treefind(P[i].Pos, DesDensNgb, h * 1.1);
-	  /*if(Hsml[i] == 0)
-	    printf("Warning! Particle %d has hsml = 0!\n", i); */
-	}
-
+  for(i = 0; i < NumPart; i++) {
+    if((i % (NumPart / 50)) == 0) {
+      printf("x");
+      fflush(stdout);
     }
-
+    if(Hsml[i] == 0)
+      Hsml[i] = h = ngb_treefind(P[i].Pos, DesDensNgb, h * 1.1);
+  }
   printf("\n");
 }
 
