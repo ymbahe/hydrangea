@@ -402,7 +402,6 @@ void form_geographic_camera_bases(struct st_base* geo, struct st_cam* cam) {
  * The degenerate points (0, -1, 0) and (0, 1, 0) are treated specially,
  * with x*'=x, y*'=z and x*'=x, y*'=-z, respectively; this keeps the bases 
  * consistent during a rotation about the x-axis.
- *
  */
 void form_camera_bases_yparallel(struct st_cam* cam) {
 
@@ -590,9 +589,6 @@ void calculate_3D_map(float** p_massMap, float** p_quantMap,
 #pragma omp parallel for schedule(static, 1)
   for(ii = 0; ii < NumPart; ii++) {
 
-    /*if (ii == 5068165) */
-    /*printf("Particle %ld...\n", ii); */
-
     /* Particle position in camera frame, in pixel units */
     MyFloat pos[2];
 
@@ -606,39 +602,24 @@ void calculate_3D_map(float** p_massMap, float** p_quantMap,
     /* Print progress signal if appropriate (not too often) */
     print_signal(ii);
 
-    /*if (ii == 5068165) */
-    /*printf("   ... getting coordinates...\n"); */
-    
     /* Calculate particle's coordinates */
     if (get_particle_coordinates(ii, cam, flag, pos, &zeta, &zeta_vel, 
 				 &hsml) < 0)
       continue;
-
-    /*if (ii == 5068165) */
-    /*printf("   ... checking FoV...\n"); */
 
     /* Check whether particle is within camera field of view */
     if(pos[0] + hsml < 0 || pos[0] - hsml > cam->image->xPix
        || pos[1] + hsml < 0 || pos[1] - hsml > cam->image->yPix)
       continue;
 
-    /*if (ii == 5068165) */
-    /*printf("   ... compute z layer...\n"); */
-    
     /* Add particle to respective layer of 3D map */
     int iz = compute_z_level(zeta, zeta_vel, cam->region, cam->image,
 			     flag);
 
-    /*if (ii == 5068165) */
-    /*printf("   ... find pixel range...\n"); */
-      
     /* Calculate range of pixels covered by this particle */
     struct st_range range;
     find_pixel_range(pos, hsml, &range, cam->image);
 
-    /*    if (ii == 5068165) */
-    /*printf("   ... find kernel normalization...\n"); */
-        
     /* Determine kernel normalizaton - stop if it is insignificant*/
     double wkNorm = get_kernel_normalization(pos, hsml, &range);
     if (wkNorm < 1.0e-10) 
@@ -649,8 +630,6 @@ void calculate_3D_map(float** p_massMap, float** p_quantMap,
     wkNorm *= cam->pix_area;
     if (cam->flag_perspectivic)
       wkNorm *= (zeta*zeta);
-
-    /*printf(" ... add to map...\n"); */
 
     /* Actually add particle contributions to map pixels */
     add_particle_to_map(pos, Mass[ii], Quantity[ii], massMap, quantMap, 
