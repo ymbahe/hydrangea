@@ -7,3 +7,7 @@ cd ./hydrangea/clib/src/HsmlAndProjectYB
 
 cd ../../src/ckat
 ./build.sh
+
+cd ../../src/sumbins
+./build.sh
+
