@@ -55,7 +55,7 @@ struct st_bins {
  * @param nArg Number of detected arguments.
  * @param argv[] The arguments passed to the main function.
  */
-void get_input(int nArg, void* argv[], double** result);
+void get_input(int nArg, void* argv[], float** result, float** kahan_c);
 
 
 static inline int64_t ind5d_bins(int64_t i, int64_t j, int64_t k, int64_t l,

@@ -5,6 +5,8 @@ import h5py as h5
 import numpy as np
 import os
 import hydrangea.hdf5 as hd
+import hydrangea.units as hu
+import ctypes as c
 
 from astropy.io import ascii
 from astropy.cosmology import Planck13
@@ -35,6 +37,13 @@ def get_snepshot_indices(rundir, snep_list='basic'):
         For each snepshot, whether it is a 'snap' or 'snip'.
     source_num : np.array(int)
         Indices of snepshot in its category (i.e. snap/snipshot).
+
+    Example
+    -------
+    >>> import hydrangea as hy
+    >>> sim = hy.objects.Simulation(index=0)
+    >>> get_snepshot_indices(sim.run_dir, snep_list='z0_only')
+    (array([206]), array(1.]), array(['snap'], dtype='<U4'), array([29]))
     """
     snepdir = rundir + '/sneplists/'
     file_name = snepdir + snep_list + '.dat'
@@ -81,7 +90,20 @@ def snep_times(time_type='aexp', snep_list='allsnaps'):
     ----
     This function retrieves the target time of the snepshot, which may
     deviate slightly from the the actual output. Use read_snepshot_time()
-    for the latter.
+    for the latter. It can be called directly from this library, without
+    any downloaded data.
+
+    Example
+    -------
+    >>> import hydrangea as hy
+    >>> hy.snep_times(time_type='zred', snep_list='allsnaps')
+    array([14.00321069,  6.77181334,  4.61422735,  3.51234012,  2.82506304,
+        2.34762658,  1.99262408,  1.71594403,  1.49271753,  1.30777929,
+        1.15130655,  1.01663116,  0.89906146,  0.79519742,  0.70250004,
+        0.61903886,  0.54331181,  0.47414852,  0.410597  ,  0.36566854,
+        0.35189723,  0.29742561,  0.24666517,  0.19918125,  0.15461335,
+        0.11265709,  0.10063854,  0.07304807,  0.03555967,  0.        ])
+
     """
     curr_dir = os.path.dirname(os.path.realpath(__file__)) + "/"
     snaptimes_file = curr_dir + 'OutputLists/' + snep_list + '.dat'
@@ -114,6 +136,12 @@ def aexp_to_time(aexp, time_type='age'):
     Conversions to age and lookback time assume a Planck 13 cosmology.
     For these, large input lists (> 1000 elements) are transformed via
     an interpolation from a fine-spaced grid in aexp, for speed gains.
+
+    Example
+    -------
+    >>> import hydrangea as hy
+    >>> hy.aexp_to_time(0.5)
+    5.863165023566443
     """
     if time_type == 'aexp':
         return aexp
@@ -142,50 +170,52 @@ def aexp_to_time(aexp, time_type='age'):
         return csi_time(aexp)
 
 
-def get_astro_conv(file_name, dataset_name):
-    """Get the conversion factor to astronomical units for a data set.
+def get_m_dm(file_name, units='astro'):
+    """Retrieve the DM particle mass from a particle file.
 
     Parameters
     ----------
     file_name : str
-        The file containing the target data set.
-    dataset_name : str
-        The data set for which to compute the conversion factor.
+        The full name of the file from which to look up the mass.
+    units : str, optional
+        The desired unit system for the result (default: 'astro', i.e. M_sun)
 
     Returns
     -------
-    conv : float or None
-        Conversion factor (None if it could not be determined).
+    m_dm : float
+        The mass of the DM particle.
+
+    Note
+    ----
+    This value is retrievable from any snapshot file,
+    and is identical across different outputs from the same simulation.
+    It does, however, vary slightly between different simulations.
+
+    Example
+    -------
+    >>> import hydrangea as hy
+    >>> sim = hy.objects.Simulation(index=0)
+    >>> hy.get_m_dm(sim.get_snap_file(29))
     """
-    f = h5.File(file_name, 'r')
-    dSet = f[dataset_name]
-    try:
-        hscale_exponent = dSet.attrs["h-scale-exponent"]
-        ascale_exponent = dSet.attrs["aexp-scale-exponent"]
-
-        header = f["/Header"]
-        aexp = header.attrs["ExpansionFactor"]
-        h_hubble = header.attrs["HubbleParam"]
-    except KeyError:
-        f.close()
-        return None
-    f.close()
-
-    astro_conv = aexp**ascale_exponent * h_hubble**hscale_exponent
-    return astro_conv
+    m_dm = hd.read_attribute(file_name, 'Header', 'MassTable')[1]
+    if units == 'data':
+        return m_dm
+    clean_factor = 1.0/hd.read_attribute(file_name, 'Header', 'HubbleParam')
+    m_dm *= clean_factor
+    if units in ['clean', 'astro']:
+        return m_dm
+    m_dm *= 1e10 * hu.SOLAR_MASS
+    if units == 'si':
+        return m_dm
+    if units == 'cgs':
+        return m_dm * 1e3
+    else:
+        print(f"Unsupported unit system '{units}'!")
 
 
-def get_m_dm(file_name, astro=True):
-    """Retrieve the DM particle mass from a particle file."""
-    m_dm = hd.read_attribute(file_name, 'Header', 'MassTable')[0]
-    if astro:
-        m_dm /= hd.read_attribute(file_name, 'Header', 'HubbleParam')
-    return m_dm
-
-
-def get_m_baryon(file_name, astro=True):
+def get_m_baryon(file_name, units='astro'):
     """Retrieve the initial baryon mass from a particle file."""
-    m_dm = get_m_dm(file_name, astro=astro)
+    m_dm = get_m_dm(file_name, units=units)
     omega_matter = hd.read_attribute(file_name, 'Header', 'Omega0')
     omega_baryon = hd.read_attribute(file_name, 'Header', 'Omega_Baryon')
     return m_dm * omega_baryon/omega_matter / (1-omega_baryon/omega_matter)
@@ -221,6 +251,15 @@ def ind_to_block(indices, offsets, lengths=None):
     to offsets, i.e. a trailing entry with the total number of elements
     assigned to blocks. This enables the correct identification of
     (potential) input elements beyond the range of the last block.
+
+    Example
+    -------
+    >>> import hydrangea as hy
+    >>> indices = np.array([1, 5, 6, 79, 81])
+    >>> offsets = np.array([0, 6, 10, 50, 80, 100])
+    >>> lengths = np.array([6, 4, 20, 20, 2])
+    >>> hy.ind_to_block(indices, offsets, lengths)
+    array([ 0, 0,  1, -1,  4], dtype=int32)
     """
     block_guess = np.searchsorted(offsets, indices, side='right')-1
 
@@ -343,79 +382,90 @@ def _find_z_string(sim_dir, dir_type, index_string):
         return None
 
 
-def sum_bins(quant, *args):
+def sum_bins(*args, **kwargs):
     """Sum up a quantity split by multiple indices.
-    
+
     Parameters
     ----------
     quant : ndarray
-        The quant
-        
-    print("Binning up masses... ", end = '', flush = True)
+        The quantity to sum up (float32)
+    indices : ndarrays (1-8)
+        The index or indices according to which to sum the quantity.
 
-    mass_binned = np.zeros((7,                  # 7 possible origin codes       
-                            n_host,
-                            host_mhalo_nbins,
-                            root_mass_nbins,
-                            host_lograd_nbins,
-                            host_relrad_nbins,
-                            age_nbins,
-                            root_lograd_nbins), dtype = np.float64)
+    Returns
+    -------
+    sum_array : ndarray (float32)
+        The sum of the quantity in each combination of supplied indices.
 
-
-    # *********** IMPORTANT ********************************                    
-    # This next line needs to be modified to point                              
-    # to the full path of where the library has been copied.                    
-    # *******************************************************                   
-
-    ObjectFile = "/u/ybahe/ANALYSIS/PACKAGES/lib/sumbinsXD.so"
-
-    c_numPart = c.c_long(numPt)
-    c_nbins_code = c.c_byte(7)
-    c_nbins_catHost = c.c_byte(n_host)
-    c_nbins_massHalo = c.c_byte(host_mhalo_nbins)
-    c_nbins_massRoot = c.c_byte(root_mass_nbins)
-    c_nbins_radHost = c.c_byte(host_lograd_nbins)
-    c_nbins_relradHost = c.c_byte(host_relrad_nbins)
-    c_nbins_age = c.c_byte(age_nbins)
-    c_nbins_radRoot = c.c_byte(root_lograd_nbins)
-
-    partMass_p = pt_mass.ctypes.data_as(c.c_void_p)
-
-    code_p = pt_code.ctypes.data_as(c.c_void_p)
-    hostCatBin_p = pt_host_cat.ctypes.data_as(c.c_void_p)
-    hostMhaloBin_p = pt_host_mhalo.ctypes.data_as(c.c_void_p)
-    rootMassBin_p = pt_root_mass.ctypes.data_as(c.c_void_p):
-    hostRadBin_p = pt_host_rad.ctypes.data_as(c.c_void_p)
-    hostRelradBin_p = pt_host_relrad.ctypes.data_as(c.c_void_p)
-    rootRadBin_p = pt_root_lograd.ctypes.data_as(c.c_void_p)
-    ageBin_p = pt_age.ctypes.data_as(c.c_void_p)
-
-    result_p = mass_binned.ctypes.data_as(c.c_void_p)
-
-    nargs = 19
-    myargv = c.c_void_p * nargs
-    argv = myargv(c.addressof(c_numPart),
-                  c.addressof(c_nbins_code),
-                  c.addressof(c_nbins_catHost),
-                  c.addressof(c_nbins_massHalo),
-                  c.addressof(c_nbins_massRoot),
-                  c.addressof(c_nbins_radHost),
-                  c.addressof(c_nbins_relradHost),
-                  c.addressof(c_nbins_age),
-                  c.addressof(c_nbins_radRoot),
-                  partMass_p,
-                  code_p,
-                  hostCatBin_p, hostMhaloBin_p, rootMassBin_p,
-                  hostRadBin_p, hostRelradBin_p, ageBin_p, rootRadBin_p,
-                  result_p)
-
-    lib = c.cdll.LoadLibrary(ObjectFile)
-    succ = lib.sumbins(nargs, argv)
-
-    print("Sum of particle masses: ", np.sum(pt_mass))
-    print("Sum of binned masses:   ", np.sum(mass_binned))
-
-
-    return mass_binned
+    Note
+    ----
+    The numpy.histogramdd provides similar functionality, but this function
+    is typically somewhat faster. It uses the Kahan summation algorithm
+    (https://en.wikipedia.org/wiki/Kahan_summation_algorithm) for
+    accurate float32 summation even when summing many elements.
     """
+    quant = args[0]
+    num_indices = len(args) - 1
+    if num_indices < 1:
+        print("You need to provide at least one index!")
+        set_trace()
+    if num_indices > 8:
+        print("Can currently only bin by up to 8 indices, not {num_indices}.")
+        set_trace()
+
+    num_elem = len(quant)
+
+    if 'max_indices' in kwargs:
+        max_indices = kwargs['max_indices']
+        if len(max_indices) != num_indices:
+            print("Length of max_indices does not match indices...")
+            set_trace()
+    else:
+        max_indices = np.zeros(num_indices, dtype=int)
+        for ii in range(num_indices):
+            max_indices[ii] = np.max(args[ii+1])
+
+    quant_binned = np.zeros((max_indices + 1), dtype=np.float32)
+    kahan_temp = np.zeros((max_indices + 1), dtype=np.float32)
+
+    # Convert metadata to C-compatible format
+    c_num_elem = c.c_long(num_elem)
+    c_nbins_all = [c.c_int(max_indices[ii]+1) for ii in range(num_indices)]
+    for ii in range(num_indices, 8):
+        c_nbins_all.append(c.c_int(1))
+
+    # Get pointers to in- and output arrays
+    c_nbins_pointers = [c.addressof(_c_nbins) for _c_nbins in c_nbins_all]
+
+    if quant.dtype != np.float32:
+        print(id(quant))
+        quant = np.array(quant, dtype=np.float32)
+    quant_p = quant.ctypes.data_as(c.c_void_p)
+
+    indices_p = []
+    transargs = [None]*8
+    dummy_array = np.zeros(num_elem, dtype=np.int32)
+    for ii in range(8):
+        if ii < num_indices:
+            if args[ii+1].dtype == np.int32:
+                indices_p.append(args[ii+1].ctypes.data_as(c.c_void_p))
+            else:
+                transargs[ii] = args[ii+1].astype(np.int32)
+                indices_p.append(transargs[ii].ctypes.data_as(c.c_void_p))
+        else:
+            indices_p.append(dummy_array.ctypes.data_as(c.c_void_p))
+    result_p = quant_binned.ctypes.data_as(c.c_void_p)
+    kahan_p = kahan_temp.ctypes.data_as(c.c_void_p)
+
+    nargs = 20
+    myargv = c.c_void_p * nargs
+    argv = myargv(c.addressof(c_num_elem),
+                  *c_nbins_pointers,
+                  quant_p,
+                  *indices_p,
+                  result_p, kahan_p)
+
+    object_dir = os.path.dirname(os.path.realpath(__file__)) + "/clib/"
+    lib = c.cdll.LoadLibrary(object_dir + 'sumbins.so')
+    lib.sumbins(nargs, argv)
+    return quant_binned

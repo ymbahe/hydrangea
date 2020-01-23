@@ -8,7 +8,7 @@ import numpy as np
 
 import hydrangea as hy
 
-BASE_DIR = '/net/quasar/data3/Hydrangea/'
+BASE_DIR = hy.local.BASE_DIR
 
 
 class Simulation:

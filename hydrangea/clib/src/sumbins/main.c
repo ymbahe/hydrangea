@@ -32,18 +32,24 @@
 int sumbins(int argc, void *argv[]) {
 
   int64_t ii;
-  double* result = NULL;
+  float* result = NULL;
+  float* kahan_c = NULL;
 
   /* Parse input parameters into internally-useful form */
-  get_input(argc, argv, &result);
+  get_input(argc, argv, &result, &kahan_c);
 
   /* Go through particles and increment the right bin */
   for (ii = 0; ii < part->num; ii++) {
-    result[ind8d_bins(part->bin0[ii], part->bin1[ii], part->bin2[ii],
-		      part->bin3[ii], part->bin4[ii], part->bin5[ii],
-		      part->bin6[ii], part->bin7[ii])] 
-      += (double) (part->quant[ii]);
-  }    
+    const int64_t ind1d = ind8d_bins(part->bin0[ii], part->bin1[ii],
+				     part->bin2[ii], part->bin3[ii],
+				     part->bin4[ii], part->bin5[ii],
+				     part->bin6[ii], part->bin7[ii]);
+
+    const float kahan_y = part->quant[ii] - kahan_c[ind1d];
+    const float kahan_t = result[ind1d] + kahan_y;
+    kahan_c[ind1d] = (kahan_t - result[ind1d]) - kahan_y;
+    result[ind1d] = kahan_t;
+  }
   return 0;
 }
 
@@ -56,10 +62,10 @@ int sumbins(int argc, void *argv[]) {
  * @param nArg Number of detected arguments.
  * @param argv[] The arguments passed to the main function.
  */
-void get_input(int nArg, void* argv[], double** result) {
+void get_input(int nArg, void* argv[], float** result, float** kahan_c) {
   
   /* Check that input is as expected and abort with instructions if not */
-  if(nArg != 19) {
+  if(nArg != 20) {
     printf("\n\nWrong number of arguments supplied to sum_index.\n\n");
     printf("Required arguments (19 total):\n"
 	   "-------------------------------------------------------\n"
@@ -68,6 +74,7 @@ void get_input(int nArg, void* argv[], double** result) {
 	   " 9     Quantity    (flt32)  --> Quantity to sum        \n"
 	   " 10-17 Index[0-7]  (int32)  --> Bin index [0-7]        \n"
 	   " 18    Result      (flt64)  --> Result array           \n"
+	   " 19    Temporary   (flt64)  --> Temporary              \n"
 	   "-------------------------------------------------------\n"
 	   "\n\n");
     exit(0);
@@ -96,7 +103,8 @@ void get_input(int nArg, void* argv[], double** result) {
   part->bin6 = (int32_t*) argv[16];
   part->bin7 = (int32_t*) argv[17];
 
-  *result = (double*) argv[18];
+  *result = (float*) argv[18];
+  *kahan_c = (float*) argv[19];
  
   return;
 }
