@@ -8,7 +8,7 @@ import numpy as np
 
 import hydrangea as hy
 
-BASE_DIR = None
+BASE_DIR = hy.local.BASE_DIR
 
 
 class Simulation:
