@@ -18,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------
 
-gcc -fPIC -g -O3 -fopenmp -c -Wall -lgomp main.c 
-gcc -shared -lgomp -lm -lc -o sumbins.so main.o
+gcc -fPIC -g -O3 -c -Wall main.c 
+gcc -shared -lm -lc -o sumbins.so main.o
 cp sumbins.so ../../sumbins.so
 

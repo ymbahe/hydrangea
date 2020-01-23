@@ -32,8 +32,8 @@
 int sumbins(int argc, void *argv[]) {
 
   int64_t ii;
-  double* result = NULL;
-  double* kahan_c = NULL;
+  float* result = NULL;
+  float* kahan_c = NULL;
 
   /* Parse input parameters into internally-useful form */
   get_input(argc, argv, &result, &kahan_c);
@@ -44,8 +44,9 @@ int sumbins(int argc, void *argv[]) {
 				     part->bin2[ii], part->bin3[ii],
 				     part->bin4[ii], part->bin5[ii],
 				     part->bin6[ii], part->bin7[ii]);
-    const double kahan_y = (double) part->quant[ii] - kahan_c[ind1d];
-    const double kahan_t = (double) result[ind1d] + kahan_y;
+
+    const float kahan_y = part->quant[ii] - kahan_c[ind1d];
+    const float kahan_t = result[ind1d] + kahan_y;
     kahan_c[ind1d] = (kahan_t - result[ind1d]) - kahan_y;
     result[ind1d] = kahan_t;
   }
@@ -61,7 +62,7 @@ int sumbins(int argc, void *argv[]) {
  * @param nArg Number of detected arguments.
  * @param argv[] The arguments passed to the main function.
  */
-void get_input(int nArg, void* argv[], double** result, double** kahan_c) {
+void get_input(int nArg, void* argv[], float** result, float** kahan_c) {
   
   /* Check that input is as expected and abort with instructions if not */
   if(nArg != 20) {
@@ -102,8 +103,8 @@ void get_input(int nArg, void* argv[], double** result, double** kahan_c) {
   part->bin6 = (int32_t*) argv[16];
   part->bin7 = (int32_t*) argv[17];
 
-  *result = (double*) argv[18];
-  *kahan_c = (double*) argv[19];
+  *result = (float*) argv[18];
+  *kahan_c = (float*) argv[19];
  
   return;
 }
