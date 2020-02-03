@@ -196,6 +196,7 @@ def get_m_dm(file_name, units='astro'):
     >>> import hydrangea as hy
     >>> sim = hy.objects.Simulation(index=0)
     >>> hy.get_m_dm(sim.get_snap_file(29))
+    0.0009615178624612349
     """
     m_dm = hd.read_attribute(file_name, 'Header', 'MassTable')[1]
     if units == 'data':
