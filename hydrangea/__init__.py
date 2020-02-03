@@ -6,6 +6,7 @@ import download
 import units
 """
 
+import hydrangea.local as local
 import hydrangea.hdf5 as hdf5
 import hydrangea.crossref as crossref
 import hydrangea.objects as objects
