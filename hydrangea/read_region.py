@@ -50,11 +50,11 @@ class ReadRegion(ReaderBase):
     when the sub-selection contains more than 40% of the full catalogue.
     """
 
-    def __init__(self, file_name, part_type, anchor, size, shape=None,
-                 anchor_style='centre', verbose=1, exact=False, units='astro',
-                 coordinate_units=None,
-                 read_units=None, map_file=None, periodic=False, 
-                 load_full=False, join_threshold=100, bridge_threshold=100, 
+    def __init__(self, file_name, part_type, anchor, size, shape='sphere',
+                 anchor_style='centre', verbose=1, exact=False,
+                 units='astro', coordinate_units=None,
+                 read_units=None, map_file=None, periodic=False,
+                 load_full=False, join_threshold=100, bridge_threshold=100,
                  bridge_gap=0.5):
         """
         Initialize class instance.
@@ -63,59 +63,78 @@ class ReadRegion(ReaderBase):
         ----------
         file_name : string
             The path of the file containing the data to read. If the data
-            is spread over multiple files, it should point to the first
-            of them.
+            is spread over multiple files, it can point to any one of them.
         part_type : int
-            The (numerical) particle type to read
-            (0=gas, 1=dm, 4=stars, 5=bh)
-        coordinates : array (float)
-            The coordinates, in code units, that specify the region to read
-            from. This depends on the selected shape (below):
-                Sphere (default) --> [x_cen, y_cen, z_cen, r] (r = radius)
-                Cube --> [x_cen, y_cen, z_cen, a/2] (a = side length)
-                Box --> [x_cen, y_cen_z_cen, ax/2, ay/2, az/2]
-                     (ax, ay, az = side lengths along x, y, z axes)
-            Note that the cube and box coordinates are interpreted
-            differently if the anchor parameter (below) is set to 'bottom'.
+            The particle type code to read (0=gas, 1=DM, 4=stars, 5=BHs)
+        anchor : ndarray (3)
+            The coordinates of the 'anchor point' of the selection region
+            (its centre or corner, depending on <anchor_style>).
+            Its units are specified by <coordinate_units> (see below).
+        size : float or ndarray
+            The extent of the selection region. The format of this
+            parameter depends on the region <shape>: a single float
+            for 'sphere' or 'cube', or a sequence of three values
+            for 'box'. For a sphere, this specifies its radius, for a cube
+            its half-side-length, and for a box the half-side-lengths
+            in the x, y, and z dimension, respectively (note the
+            different interpretations for cube and box if <anchor_style>
+            is set to 'bottom', as described below).
+
         shape : string, optional
-            The shape of the region to read from. Valid options are 'sphere',
-            'cube', or 'box' (capitalized versions also accepted). If None
-            (default), a sphere is used.
+            The shape of the region to read from. Valid options are
+            'sphere' (default), 'cube', or 'box' (all case-insensitive).
         anchor_style : string, optional
-            If 'bottom', the 'centre' coordinates for cube and box shapes are
-            interpreted instead as the minimum x, y, z coordinates, and the
-            length(s) as full side length. If 'centre' (default), they
-            specify the centre instead, as described above. This parameter
-            has no effect when a sphere is selected as shape.
+            Specifies the location of the anchor within the selection
+            region. Default is 'centre' ('center' also accepted). The
+            alternative, 'bottom', places the anchor on the bottom x, y, z
+            corner of the box or cube instead. This parameter has no effect
+            for a sphere.
         verbose : int, optional
-            Frequency of log messages (default: 1==>few)
+            Frequency of log messages (default: 1 ==> few)
         exact : bool, optional
             Only load particles lying exactly within the specified region,
             at extra cost (internally reads particle positions). If False
             (default), typically also some particles slightly outside the
             selected region are loaded.
         units : str, optional
-            Shorthand to set both coordinate_units and read_units to
-            same value (default: 'astro')
+            Specifies the unit system for both the anchor and size input,
+            and any data read from the selected region. Options are:
+                'data' : as on file
+                'clean' : as 'data', but with a and h factors removed
+                'astro' : 'astronomically sensible' units (e.g. pMpc, M_sun)
+                'si' : the standard SI unit system
+                'cgs' : alternative unit system favoured by astronomers
         coordinate_units : str or None, optional
-            Unit system in which to interpret the supplied coordinates.
-            If None (default), the same as <units> is used. 
-            (--> lengths in pMpc); alternatives are
-            'data' (as in file), 'clean' (as in file, with a and h factors
-            removed), 'cgs', or 'SI'.
+            Unit system in which to interpret the input coordinates.
+            If None (default), the same as <units> is used.
         read_units : str or None, optional
-            Unit system to which to convert read data (default: same as
-            units).
+            Unit system to which to convert read data (default: <units>).
         map_file : string, optional
             Location of the particle map file to use. If None (default),
             it is assumed to be 'ParticleMap.hdf5' in the same directory
-            as file_name.
+            as <file_name>.
         periodic : bool, optional
             Assume that the simulation volume is periodic and completely
-            tiled with particle map cells (default: False).
+            tiled with particle map cells (default: False). This option
+            is not applicable to any of the Hydrangea/C-EAGLE simulations.
         load_full : bool, optional
-            Ignore specified region and load full particle catalogue
-            (default: False).
+            Load entire particle catalogue irrespective of specified region
+            (default: False). If <exact> is True, the data will still
+            be cut to the exact shape of the selected region afterwards.
+
+        join_threshold : int, optional
+            Threshold number of segments above which directly adjoining
+            segments are joined to speed up the reading (default: 100).
+        bridge_threshold : int, optional
+            Threshold number of segments remaining after directly
+            neighbouring ones are joined to perform a second join round.
+            In this, elements separated by a small gap are also joined
+            (speeding up the reading at the expense of reading slightly
+            more particles). Default: 100.
+        bridge_gap : float, optional
+            Maximum size of gaps to bridge in second joining round.
+            Two segments are joined if the ratio between their combined
+            and bridged lengths are greater than <bridge_gap> (default: 0.5).
         """
         stime = time.clock()
 
@@ -203,8 +222,7 @@ class ReadRegion(ReaderBase):
     def read_data(self, dataset_name, units=None, verbose=None, exact=None,
                   file_name=None, pt_name=None, single_file=False,
                   store=False, trial=False, data_type=None):
-        """
-        Read a specified dataset for a previously set up region.
+        """Read a specified dataset for a previously set up region.
 
         Parameters
         ----------
@@ -213,13 +231,18 @@ class ReadRegion(ReaderBase):
             The leading 'PartType[x]' must however *not* be included!
 
         units : str or None, optional
-            Convert values to other units (default: class <read_units>).
-            With 'data', no conversion is done.
+            Specifies the unit system for the output. Options are:
+                'data' : as on file
+                'clean' : as 'data', but with a and h factors removed
+                'astro' : 'astronomically sensible' units (e.g. pMpc, M_sun)
+                'si' : the standard SI unit system
+                'cgs' : alternative unit system favoured by astronomers
+            If None (default), the class value <read_units> is used.
         verbose : int, optional
             Frequency of log messages. If None (default), use class value.
         exact : bool, optional
             Only return data for particles lying in the exact specified
-            selection region. Defaults to the class init value.
+            selection region (default: class init value).
         file_name : string, optional
             Specifies an alternative path to read data from. This is useful
             for reading data from ancillary catalogues. By default (None),
@@ -228,12 +251,12 @@ class ReadRegion(ReaderBase):
             Specifies an alternative particle-type group name. By default
             (None), 'PartType[x]' is used.
         single_file : bool, optional
-            Assume that data resides in a single file (default: False).
+            Assume that data resides in an un-split file (default: False).
             This is used only for ancillary catalogues.
         store : str or None or False, optional
             Store the retrieved array as an attribute with this name.
             If None, the (full) name of the data set is used, with
-            '/' replaced by '__'. Default: False.
+            '/' replaced by '__'. Default: False (do not store).
         trial : bool, optional
             Attempt to read the data set. If it does not yield the
             expected number of elements for any one file or total,
@@ -249,7 +272,7 @@ class ReadRegion(ReaderBase):
 
         Note
         ----
-        The selection of which particles to load has already been taken
+        The selection of which particles to load has already been done
         when the ReadRegion object was instantiated.
         """
         stime = time.time()
@@ -913,8 +936,8 @@ class ReadRegion(ReaderBase):
         gap_factor : float or None, optional
             If None (default), only directly adjoining segments are joined.
             Otherwise, two consecutive segments are also joined if the
-            ratio between their gap and (combined) length is less than
-            gap_factor.
+            ratio between their combined and bridged lengths is greater than
+            <gap_factor>.
         """
         # Sort segments into sequential order
         sorter = np.lexsort((self.offsets, self.files))
@@ -931,9 +954,9 @@ class ReadRegion(ReaderBase):
         else:
             # Segments separated by a small enough gap
             ind_join = np.nonzero(
-                ((self.offsets[1:]+self.lengths[1:] - self.offsets[:-1]) /
-                 (self.lengths[1:]+self.lengths[:-1]) < gap_factor)
-                & (self.files[1:] == self.files[:-1]))[0]+1
+                ((self.lengths[1:]+self.lengths[:-1])
+                 / (self.offsets[1:]+self.lengths[1:] - self.offsets[:-1])
+                 > gap_factor) & (self.files[1:] == self.files[:-1]))[0]+1
 
             # Need to 'back-extend' to-be-joined segments to the
             # end of the one they are joining (to add particles in gap)
