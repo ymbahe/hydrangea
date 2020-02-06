@@ -57,22 +57,24 @@ def download_data(base_dir, suite='10r200', sim=None, index=None,
 
     if index is not None:
         zstrings = get_zstrings(index)
-    
+    if np.isscalar(index):
+        zstrings = [zstrings]
+        
     for isim in sim:
         sim_base = f'{suite}/CE-{isim}/{sim_type}'
         for itype in type_list:
             if itype == 'snapshot':
-                for iindex in index:
+                for iindex, index_curr in enumerate(index):
                     download_snapshot(base_dir, sim_base, 
-                                      iindex, zstrings[iindex])
+                                      index_curr, zstrings[iindex])
             elif itype == 'subfind':
-                for iindex in index:
+                for iindex, index_curr in enumerate(index):
                     download_subfind(base_dir, sim_base,
-                                     iindex, zstrings[iindex])
+                                     index_curr, zstrings[iindex])
             elif itype == 'magnitudes':
-                for iindex in index:
+                for iindex, index_curr in enumerate(index):
                     download_magnitudes(base_dir, sim_base,
-                                        iindex, zstrings[iindex])
+                                        index_curr, zstrings[iindex])
             elif itype == 'spiderweb':
                 download_spiderweb(base_dir, sim_base,
                                    target='tables')
