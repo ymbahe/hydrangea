@@ -214,12 +214,15 @@ def write_data(file_name, container, array,
 
         if replace:
             del f[container]
+
         else:
             dSet = f[container]
             if dSet.shape != array.shape:
                 print("Existing dataset has wrong shape...")
-                del dSet
-    else:
+                del f[container]
+
+    # We may have just removed the data set, so have to check again
+    if container in f:
         dSet = f.create_dataset(container, array.shape, dtype=array.dtype,
                                 compression=compression)
 
