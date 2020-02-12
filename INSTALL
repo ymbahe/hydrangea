@@ -1,0 +1,18 @@
+Once you have downloaded the repository, it is installed with the following
+commands:
+
+1.) [Optional] Specify the local data base directory in file
+    .../hydrangea/local.py (e.g.: BASE_DIR = '/path/to/base/dir')
+    This makes it slightly easier to specify simulation directories later.
+
+2.) [Optional] Compile the external C libraries (only required for speed-up
+    in a few functions)
+    ./c_install.sh
+
+3.) Install the hydrangea package in your python installation:
+    pip install --user .
+
+You should now be able to import the hydrangea package in python scripts.
+
+
+
