@@ -15,5 +15,6 @@ import hydrangea.units as units
 
 from hydrangea.read_region import ReadRegion
 from hydrangea.split_file import SplitFile
+from hydrangea.objects import Simulation
 
 from hydrangea.tools import *
