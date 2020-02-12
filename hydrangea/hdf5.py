@@ -222,7 +222,7 @@ def write_data(file_name, container, array,
                 del f[container]
 
     # We may have just removed the data set, so have to check again
-    if container in f:
+    if container not in f:
         dSet = f.create_dataset(container, array.shape, dtype=array.dtype,
                                 compression=compression)
 
