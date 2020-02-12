@@ -2,10 +2,7 @@
 
 # Compile and install C libraries
 
-cd ./hydrangea/clib/src/HsmlAndProjectYB
-./build.sh
-
-cd ../../src/ckat
+cd ./hydrangea/clib/src/ckat
 ./build.sh
 
 cd ../../src/sumbins
