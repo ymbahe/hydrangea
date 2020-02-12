@@ -52,8 +52,8 @@ class SplitFile(ReaderBase):
             Specify level of log output, from 0 (minimal) to 2 (lots).
             Default: 1.
         units : str or None, optional
-            Convert values to other units (default: 'astro').
-            With 'data', no conversion is done.
+            Convert values to other units (default: 'astro'; capitalization
+            is ignored). With 'data', no conversion is done.
         read_range : (int, int) or None, optional
             Read only elements from the first up to *but excluding* the
             second entry in the tuple. If None (default), load entire
@@ -70,10 +70,9 @@ class SplitFile(ReaderBase):
         For proper functionality, read_range requires that the file
         offsets be determined. If this is not possible, the entire
         data set will be read and then truncated (slower).
-
         """
         self.verbose = verbose
-        self.units = units
+        self.units = units.lower()
         self.read_index = read_index
         if read_index is None:
             self.read_range = read_range
@@ -112,6 +111,7 @@ class SplitFile(ReaderBase):
             groups, but *not* the main group specified in the instantiation.
         units : str or None, optional
             Convert to other unit system (default: class init value).
+            Capitalization is ignored for these names.
         verbose : int, optional
             Provide more or less useful messages during reading.
             Default: 1 (minimal)
@@ -135,6 +135,8 @@ class SplitFile(ReaderBase):
         """
         if units is None:
             units = self.units
+        else:
+            units = units.lower()
         if verbose is None:
             verbose = self.verbose
 

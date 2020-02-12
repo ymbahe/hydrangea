@@ -104,11 +104,14 @@ class ReadRegion(ReaderBase):
                 'astro' : 'astronomically sensible' units (e.g. pMpc, M_sun)
                 'si' : the standard SI unit system
                 'cgs' : alternative unit system favoured by astronomers
+            Capitalization is ignored for all unit names.
         coordinate_units : str or None, optional
             Unit system in which to interpret the input coordinates.
-            If None (default), the same as <units> is used.
+            If None (default), the same as <units> is used. Capitalization
+            is ignored.
         read_units : str or None, optional
             Unit system to which to convert read data (default: <units>).
+            Capitalization is ignored here.
         map_file : string, optional
             Location of the particle map file to use. If None (default),
             it is assumed to be 'ParticleMap.hdf5' in the same directory
@@ -150,9 +153,13 @@ class ReadRegion(ReaderBase):
         self.anchor_style = anchor_style
 
         if read_units is None:
-            read_units = units
+            read_units = units.lower()
+        else:
+            read_units = read_units.lower()
         if coordinate_units is None:
-            coordinate_units = units
+            coordinate_units = units.lower()
+        else:
+            coordinate_units = coordinate_units.lower()
         self.read_units = read_units
 
         # Deal with different shape inputs
@@ -238,6 +245,7 @@ class ReadRegion(ReaderBase):
                 'si' : the standard SI unit system
                 'cgs' : alternative unit system favoured by astronomers
             If None (default), the class value <read_units> is used.
+            Capitalization is ignored for unit names.
         verbose : int, optional
             Frequency of log messages. If None (default), use class value.
         exact : bool, optional
@@ -295,6 +303,8 @@ class ReadRegion(ReaderBase):
 
         if units is None:
             units = self.read_units
+        else:
+            units = units.lower()
 
         # Deal with special case of loading the full particle catalogue
         if self.load_full:
