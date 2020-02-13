@@ -140,6 +140,8 @@ class SplitFile(ReaderBase):
         if verbose is None:
             verbose = self.verbose
 
+        self.read_units = self.units   # For compatibility with ReadRegion
+
         # Check that setup has been done properly
         if self.num_files is None:
             print("I don't know how many files to read...")

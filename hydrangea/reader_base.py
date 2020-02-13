@@ -203,7 +203,7 @@ class ReaderBase:
                 print("*** Looks like you are trying to load m_dm for "
                       "non-snapshot! ***")
                 set_trace()
-            self._m_dm = ht.get_m_dm(self.file_name, units=self.units)
+            self._m_dm = ht.get_m_dm(self.file_name, units=self.read_units)
         return self._m_dm
 
     @property
@@ -214,7 +214,8 @@ class ReaderBase:
                 print("*** Looks like you are trying to load m_baryon for "
                       "non-snapshot! ***")
                 set_trace()
-            self.m_baryon = ht.get_m_baryon(self.file_name, units=self.units)
+            self.m_baryon = ht.get_m_baryon(self.file_name, 
+                                            units=self.read_units)
         return self._m_baryon
 
     def get_time(self, timeType='aexp'):
