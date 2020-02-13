@@ -196,16 +196,19 @@ def get_m_dm(file_name, units='astro'):
     >>> import hydrangea as hy
     >>> sim = hy.objects.Simulation(index=0)
     >>> hy.get_m_dm(sim.get_snap_file(29))
-    0.0009615178624612349
+    9615178.624612348
     """
     m_dm = hd.read_attribute(file_name, 'Header', 'MassTable')[1]
     if units == 'data':
         return m_dm
     clean_factor = 1.0/hd.read_attribute(file_name, 'Header', 'HubbleParam')
     m_dm *= clean_factor
-    if units in ['clean', 'astro']:
+    if units == 'clean':
         return m_dm
-    m_dm *= 1e10 * hu.SOLAR_MASS
+    m_dm *= 1e10
+    if units == 'astro':
+        return m_dm
+    m_dm *= hu.SOLAR_MASS
     if units == 'si':
         return m_dm
     if units == 'cgs':
