@@ -1,4 +1,9 @@
-"""Demonstrate loading particles near a given subhalo."""
+"""Demonstrate loading particles near a given subhalo.
+
+This is an example of how to use the ReadRegion class to quickly read in
+particle data within a small sub-volume of the simulation. It creates
+a simple stellar surface density map of one galaxy.  
+"""
 
 # Import required packages
 import numpy as np
@@ -26,27 +31,63 @@ snapshot_file = sim.get_snap_file(snap_index)
 # we can access all properties of the selected subhalo as attributes
 # of <subhalo>; they are loaded when first required. By default, quantities
 # are returned in 'astronomically sensible' units (e.g. Mpc, Gyr, km/s). 
+print("Setting up <subhalo> reader:")
 subhalo = hy.SplitFile(subfind_file, 'Subhalo', read_index=sh_index)
 
 # Set up a reading region around subhalo.
 # By default, coordinates are expected in Mpc, the same as the default
 # output from <subhalo>. From it, we can access all properties of the
 # particles in the selected region as attributes of <parts> (analogous to
-# <subhalo>).
+# <subhalo>). Note that 'size' here refers to the half-side length of
+# the cube; with a 'sphere' shape it would be the radius.
+print("\nSetting up <parts> reader:")
 parts = hy.ReadRegion(snapshot_file,               # (First) file to read
                       ptype,                       # Particle type to read
                       subhalo.CentreOfPotential,   # Centre of region
                       imsize/1e3,                  # Size of region
                       shape='cube')                # Shape of region
+print("")
 
+# -------- Aside ----------------------------------------------------------
+
+# With <parts>, we are guaranteed to read in all particles within the
+# specified cube, but typically also some particles beyond it will be read.
+# We can also specify that we only want particles exactly in the selection
+# region, but this takes slightly longer to set up (here using a sphere):
+parts_sphere = hy.ReadRegion(snapshot_file, ptype, subhalo.CentreOfPotential,
+                             imsize/1e3, shape='sphere', exact=True,
+                             verbose=0)  # Silence in the library...
+
+# Now we can, for example, get the total mass or total mass-weighted
+# metallicity of all stars within the specified sphere:
+galaxy_mstar = parts_sphere.total_in_region('Mass')
+galaxy_zstar = parts_sphere.total_in_region('Metallicity', weight_quant='Mass')
+print("------------------------------------------------------")
+print(f"Subhalo {sh_index} has M_star = {galaxy_mstar:.3e} M_sun, "
+      f"Z_star = {galaxy_zstar:.3f}")
+print("------------------------------------------------------")
+
+# We can also read one particular data set in a different unit system,
+# for example stellar velocities in SI (m/s). Unit conversions are ignored
+# for dimensionless quantities:
+part_vel_si = parts_sphere.read_data("Velocity", units="SI")
+part_ids = parts_sphere.read_data("ParticleIDs", units="cgs")
+print("----------------------------------------------------------------------")
+print(f"Particle ID={part_ids[0]} has velocity "
+      f"{part_vel_si[0, 0]:.3f}/{part_vel_si[0, 1]:.3f}/"
+      f"{part_vel_si[0, 2]:.3f} m/s")
+print("----------------------------------------------------------------------")
+
+# ------- Back to main script purpose -------------------------------------
 
 # Get particle coordinates relative to subhalo centre (in kpc)
+print("\nNote how <parts> now reads the 'Coordinates' and 'Mass' data sets:")
 part_relpos = (parts.Coordinates - subhalo.CentreOfPotential[None, :]) * 1e3
 
 # Make a simple 2D histogram map of mass surface density
 sigma = np.histogram2d(part_relpos[:, 1], part_relpos[:, 0], bins=nbins,
                        range=[[-imsize, imsize], [-imsize, imsize]],
-                       weights=parts.Mass)[0] / (imsize/nbins**2)
+                       weights=parts.Mass)[0] / ((imsize/nbins)**2)
 
 # Plot the histogram, in log scale
 fig = plt.figure(figsize=(4/0.8, 4))
