@@ -203,9 +203,12 @@ def get_m_dm(file_name, units='astro'):
         return m_dm
     clean_factor = 1.0/hd.read_attribute(file_name, 'Header', 'HubbleParam')
     m_dm *= clean_factor
-    if units in ['clean', 'astro']:
+    if units == 'clean':
         return m_dm
-    m_dm *= 1e10 * hu.SOLAR_MASS
+    m_dm *= 1e10
+    if units == 'astro':
+        return m_dm
+    m_dm *= hu.SOLAR_MASS
     if units == 'si':
         return m_dm
     if units == 'cgs':
