@@ -1,21 +1,28 @@
-"""Demonstration script to plot the phase diagram of one simulation."""
+"""Demonstration script to plot the phase diagram of one simulation.
+
+It illustrates using the SplitFile class to read in an entire particle
+catalogue for a snapshot.
+"""
 
 import hydrangea as hy
 import numpy as np
 import matplotlib.pyplot as plt
+from pdb import set_trace
+import sys
 
 # Set script parameters
 sim_index = 14                 # Which simulation do we want?
 snap_index = 29                # Which snapshot do we want to analyse?
-temp_range = [3.0, 9.0]        # Plot range in (log) temperature [K]
+temp_range = [2.5, 9.0]        # Plot range in (log) temperature [K]
 nH_range = [-9.0, 3.0]         # Plot range in (log) nH [cm^-3]
+scale_range = [9.0, 14.5]      # Scale range of plot
 nbins = 100                    # Number of bins per axis
 plotloc = 'phase_diagram.png'  # Where to save the output plot?
 
 # Prepare the plot
 fig = plt.figure(figsize=(5, 4))
 fig = plt.figure(figsize=(5/0.8, 4))
-ax1 = fig.add_axes([0.15, 0.15, 0.65, 0.8])
+ax1 = fig.add_axes([0.12, 0.15, 0.65, 0.8])
 
 # Set up the simulation object for the run we're working with, to easily
 # get the relevant file paths
@@ -52,11 +59,14 @@ histogram, xe, ye = np.histogram2d(np.log10(gas.Temperature[ind_select]),
                                    bins=[nbins, nbins], 
                                    range=[temp_range, nH_range])
 
+# Avoid NaN values in log by adding a *very* small offset to all values
+histogram += sys.float_info.min
 
 # Plot the 2D histogram
 da = (xe[1]-xe[0]) * (ye[1]-ye[0])
 im = plt.imshow(np.log10(histogram/da), cmap=plt.cm.inferno,
-           extent=[-6, 3, 3, 9], origin='lower', aspect='equal')
+                extent=[*nH_range, *temp_range], origin='lower', aspect='auto',
+                vmin=scale_range[0], vmax=scale_range[1])
 
 ax = plt.gca()
 ax.set_xlim(nH_range)
@@ -69,7 +79,7 @@ ax2 = fig.add_axes([0.81, 0.15, 0.05, 0.8])
 ax2.set_xticks([])
 ax2.set_yticks([])
 cbar = plt.colorbar(im, cax=ax2, orientation='vertical')
-fig.text(0.95, 0.5, r'log$_{10}$ (d$M_\mathrm{gas}$ / ' 
+fig.text(0.94, 0.55, r'log$_{10}$ (d$M_\mathrm{gas}$ / ' 
          '(dlog$_{10}\,T$ dlog$_{10}\,n_\mathrm{H}$) [M$_\odot$])',
          rotation=90.0, va='center', ha='left')
 
