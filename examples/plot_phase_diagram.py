@@ -7,7 +7,6 @@ catalogue for a snapshot.
 import hydrangea as hy
 import numpy as np
 import matplotlib.pyplot as plt
-from pdb import set_trace
 import sys
 
 # Set script parameters
@@ -51,12 +50,12 @@ ind_select = np.nonzero(
     np.linalg.norm(gas.Coordinates - fof_cl.GroupCentreOfPotential[None, :],
                    axis=1) <= 10.0*fof_cl.Group_R_Crit200)[0]
 
-# Create the 2D histogram. The particle temperatures, densities, and 
-# masses are read in implicitly as they are being accessed. 
+# Create the 2D histogram. The particle temperatures, densities, and
+# masses are read in implicitly as they are being accessed.
 histogram, xe, ye = np.histogram2d(np.log10(gas.Temperature[ind_select]),
                                    np.log10(gas.Density[ind_select]),
                                    weights=gas.Mass[ind_select],
-                                   bins=[nbins, nbins], 
+                                   bins=[nbins, nbins],
                                    range=[temp_range, nH_range])
 
 # Avoid NaN values in log by adding a *very* small offset to all values
@@ -79,11 +78,10 @@ ax2 = fig.add_axes([0.81, 0.15, 0.05, 0.8])
 ax2.set_xticks([])
 ax2.set_yticks([])
 cbar = plt.colorbar(im, cax=ax2, orientation='vertical')
-fig.text(0.94, 0.55, r'log$_{10}$ (d$M_\mathrm{gas}$ / ' 
-         '(dlog$_{10}\,T$ dlog$_{10}\,n_\mathrm{H}$) [M$_\odot$])',
+fig.text(0.94, 0.55, r'log$_{10}$ (d$M_\mathrm{gas}$ / '
+         r'(dlog$_{10}\,T$ dlog$_{10}\,n_\mathrm{H}$) [M$_\odot$])',
          rotation=90.0, va='center', ha='left')
 
 # Save the figure
 plt.show
 plt.savefig(plotloc, transparent=False, dpi=150)
-                        

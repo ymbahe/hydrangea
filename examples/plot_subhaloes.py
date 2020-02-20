@@ -47,7 +47,7 @@ for iradius, line in enumerate([(fof_cl.Group_R_Crit200, '-', 'black'),
                                 (fof_cl.Group_R_TopHat200, '-.', 'red')]):
     plt.plot(line[0]*np.cos(phi), line[0]*np.sin(phi), color=line[2],
              linestyle=line[1], linewidth=0.5)
-    
+
 # Extract the position of all subhaloes, relative to the cluster, in Mpc.
 delta_pos = (subhaloes.CentreOfPotential
              - fof_cl.GroupCentreOfPotential[None, :])
@@ -65,11 +65,11 @@ ind_suspect_subhalo = np.nonzero((boundary_flag > 1) &
                                  (subhaloes.Mass > min_subhalo_mass))[0]
 
 # Plot the subhaloes. We indicate total mass by size, and stellar mass by
-# colour. Let's use different symbols for subhaloes far from and near 
+# colour. Let's use different symbols for subhaloes far from and near
 # the boundary.
 sc = plt.scatter(delta_pos[ind_good_subhalo, 0],
                  delta_pos[ind_good_subhalo, 1],
-                 marker='o', 
+                 marker='o',
                  c=np.log10(subhaloes.MassType[ind_good_subhalo, 4]),
                  s=(np.log10(subhaloes.Mass[ind_good_subhalo]
                              / min_subhalo_mass))*10,
@@ -85,7 +85,7 @@ plt.scatter(delta_pos[ind_suspect_subhalo, 0],
             cmap=plt.cm.viridis,
             vmin=6, vmax=12, edgecolor='none')
 
-    
+# Some embellishments for the plot
 ax1.set_xlim((-imsize, imsize))
 ax1.set_ylim((-imsize, imsize))
 ax1.set_xlabel(r'$\Delta x$ [Mpc]')
