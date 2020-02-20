@@ -571,11 +571,15 @@ class SplitFile(ReaderBase):
             return None
         if '_file_offsets' not in dir(self):
             start_time = time.time()
-            pm_file_name = (os.path.dirname(self.file_name)
-                            + '/ParticleMap.hdf5')
+            catalogue_dir = os.path.dirname(self.file_name)
+            pm_file_name = catalogue_dir + '/ParticleMap.hdf5'
+            file_offset_name = catalogue_dir + '/FileOffsets.hdf5'
             if os.path.exists(pm_file_name):
                 self._print(2, "Loading file offsets from map...")
                 self._find_file_offsets_from_map(pm_file_name)
+            elif os.path.exists(file_offset_name):
+                self._print(2, "Loading file offsets from list...")
+                self._find_file_offsets_from_list(file_offset_name)
             else:
                 self._print(2, "Finding file offsets one-by-one.")
                 self._find_file_offsets()
@@ -588,6 +592,10 @@ class SplitFile(ReaderBase):
         self._file_offsets = hd.read_data(
             map_file_name, self.base_group + '/FileOffset')
 
+    def _find_file_offsets_from_list(self, list_file_name):
+        """Extract offsets of each file from pre-compiled list."""
+        self._file_offsets = hd.read_data(list_file_name, self.base_group)
+  
     def _find_file_offsets(self):
         """Find file offsets sequentially from individual files."""
         self._file_offsets = np.zeros(self.num_files + 1, dtype=int)
