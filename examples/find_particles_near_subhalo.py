@@ -2,7 +2,7 @@
 
 This is an example of how to use the ReadRegion class to quickly read in
 particle data within a small sub-volume of the simulation. It creates
-a simple stellar surface density map of one galaxy.  
+a simple stellar surface density map of one galaxy.
 """
 
 # Import required packages
@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 # Set script parameters
 sim_index = 0               # Which simulation do we want?
 snap_index = 29             # Which snapshot? 29 --> z = 0
-sh_index = 8                # Which subhalo? 
+sh_index = 8                # Which subhalo?
 imsize = 50                 # (Half-)size of analysis region, in kpc
 nbins = 100                 # Number of bins for plotting
 ptype = 4                   # Look at stars here
@@ -30,7 +30,7 @@ snapshot_file = sim.get_snap_file(snap_index)
 # interested in one particular object (to speed things up). From this,
 # we can access all properties of the selected subhalo as attributes
 # of <subhalo>; they are loaded when first required. By default, quantities
-# are returned in 'astronomically sensible' units (e.g. Mpc, Gyr, km/s). 
+# are returned in 'astronomically sensible' units (e.g. Mpc, Gyr, km/s).
 print("Setting up <subhalo> reader:")
 subhalo = hy.SplitFile(subfind_file, 'Subhalo', read_index=sh_index)
 
@@ -96,9 +96,9 @@ log_sigma = np.log10(sigma + 1e-5)  # Add small bias to avoid NaNs
 ind_good = np.nonzero(log_sigma >= -4)
 vmin, vmax = np.percentile(log_sigma[ind_good], [0.01, 99.9])
 im = plt.imshow(log_sigma,
-                extent = [-imsize, imsize, -imsize, imsize],
-                aspect = 'equal', interpolation = 'nearest', 
-                origin = 'lower', alpha = 1.0, cmap=plt.cm.inferno,
+                extent=[-imsize, imsize, -imsize, imsize],
+                aspect='equal', interpolation='nearest',
+                origin='lower', alpha=1.0, cmap=plt.cm.inferno,
                 vmin=vmin, vmax=vmax)
 
 ax1.set_xlim((-imsize, imsize))
@@ -117,7 +117,3 @@ fig.text(0.95, 0.5, r'log$_{10}$ ($\Sigma$ [M$_\odot$ kpc$^{-2}$])',
 # Save the figure
 plt.show
 plt.savefig(plotloc, transparent=False)
-
-
-
-
