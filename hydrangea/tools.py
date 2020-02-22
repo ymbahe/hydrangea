@@ -123,6 +123,7 @@ def get_next_snapshot(aexp):
     aexp_snaps = snep_times()
     return np.searchsorted(aexp_snaps, aexp)
 
+
 def aexp_to_time(aexp, time_type='age'):
     """Convert expansion factor to another time flavour.
 
