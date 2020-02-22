@@ -41,7 +41,7 @@ class Simulation:
         self.spider_loc = self.high_level_dir + 'SpiderwebTables.hdf5'
         self.sh_extra_loc = self.high_level_dir + 'SubhaloExtra.hdf5'
 
-    def get_snap_file(self, index):
+    def get_snapshot_file(self, index):
         """Form the (first) file of a given snapshot."""
         return hy.form_files(self.run_dir, index, types='snap')
 
@@ -54,19 +54,27 @@ class Simulation:
         return hy.form_files(self.run_dir, index, types='snap',
                              snep_type='snip')
 
+    def get_snap_file(self, index):
+        """Shorthand alias for get_snapshot_file()."""
+        self.get_snapshot_file(self, index)
+
+    def get_snip_file(self, index):
+        """Shorthand alias for get_snipshot_file()."""
+        self.get_snipshot_file(self, index)
+
 
 class Cantor:
     """Representation of a Cantor catalogue.
-    
-    This object can be used to conveniently load and store the data
-    from a Cantor catalogue. 
 
-    Similar to SplitFile, it provides the 
+    This object can be used to conveniently load and store the data
+    from a Cantor catalogue.
+
+    Similar to SplitFile, it provides the
     option to specify a reading range or explicit indices of which
     objects to read data for. Both provide the same behaviour for the
-    'main' catalogue. However, for the 'extra' catalogue, indices 
+    'main' catalogue. However, for the 'extra' catalogue, indices
     are translated to the appropriate extra index, whereas ranges
-    (and full catalogues) directly load the entries in the extra 
+    (and full catalogues) directly load the entries in the extra
     catalogue as well.
     """
 
