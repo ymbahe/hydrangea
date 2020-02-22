@@ -49,6 +49,11 @@ class Simulation:
         """Form the (first) file of a given subfind catalogue."""
         return hy.form_files(self.run_dir, index, types='sub')
 
+    def get_snipshot_file(self, index):
+        """Form the (first) file of a given snipshot."""
+        return hy.form_files(self.run_dir, index, types='snap',
+                             snep_type='snip')
+
 
 class Cantor:
     """Representation of a Cantor catalogue.
