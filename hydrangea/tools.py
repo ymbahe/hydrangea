@@ -16,7 +16,7 @@ from scipy.interpolate import interp1d
 from pdb import set_trace
 
 
-def get_snepshot_indices(rundir, snep_list='basic'):
+def get_snepshot_indices(rundir, snep_list='basic', index=None):
     """
     Extract type, number, and aexp for snepshots from a specified list.
 
@@ -26,6 +26,8 @@ def get_snepshot_indices(rundir, snep_list='basic'):
         The base directory of the simulation.
     snep_list : str, optional
         The snepshot list to extract, without extension (default: 'basic')
+    index : int or ndarray(int) or None, optional
+        If not None (default), return only entries for specified snepshots.
 
     Returns
     -------
@@ -55,7 +57,11 @@ def get_snepshot_indices(rundir, snep_list='basic'):
     source_type = np.array(data['sourceType'])
     source_num = np.array(data['sourceNum'])
 
-    return root_index, aexp, source_type, source_num
+    if index is None:
+        return root_index, aexp, source_type, source_num
+    else:
+        return (root_index[index], aexp[index],
+                source_type[index], source_num[index])
 
 
 def snep_times(time_type='aexp', snep_list='allsnaps'):
@@ -111,6 +117,11 @@ def snep_times(time_type='aexp', snep_list='allsnaps'):
 
     return aexp_to_time(aexp, time_type)
 
+
+def get_next_snapshot(aexp):
+    """Find the next (lower-z) snapshot for a given expansion factor."""
+    aexp_snaps = snep_times()
+    return np.searchsorted(aexp_snaps, aexp)
 
 def aexp_to_time(aexp, time_type='age'):
     """Convert expansion factor to another time flavour.
