@@ -19,7 +19,6 @@ nbins = 100                    # Number of bins per axis
 plotloc = 'phase_diagram.png'  # Where to save the output plot?
 
 # Prepare the plot
-fig = plt.figure(figsize=(5, 4))
 fig = plt.figure(figsize=(5/0.8, 4))
 ax1 = fig.add_axes([0.12, 0.15, 0.65, 0.8])
 
