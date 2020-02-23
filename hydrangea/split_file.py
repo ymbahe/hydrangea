@@ -166,7 +166,7 @@ class SplitFile(ReaderBase):
         if data_out is not None:
             if need_to_truncate and self.read_range is not None:
                 data_out = data_out[self.read_range[0] : self.read_range[1]]
-            if isinstance(self.read_index, int):
+            if np.isscalar(self.read_index):
                 if data_out.ndim == 1:
                     data_out = data_out[0]
                 else:

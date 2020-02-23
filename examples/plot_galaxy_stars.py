@@ -4,17 +4,18 @@
 import numpy as np
 import hydrangea as hy
 import matplotlib.pyplot as plt
+from pdb import set_trace
 
 # Set script parameters
-sim_index = 0               # Which simulation do we want?
-first_snapshot_index = 11       # Which snapshot? 29 --> z = 0
-second_snapshot_index = 29      # Second snapshot? 29 --> z = 0
-ref_snapshot_index = 11
-galaxy_id = 10              # Which galaxy to plot?
-imsize = 100                 # (Half-)size of analysis region, in kpc
-nbins = 100                 # Number of bins for plotting
-ptype = 4                   # Look at stars here
-plot_range = []
+sim_index = 0                    # Which simulation do we want?
+first_snapshot_index = 8         # Which snapshot? 29 --> z = 0
+second_snapshot_index = 12       # Second snapshot? 29 --> z = 0
+ref_snapshot_index = 8
+galaxy_id = 1808                   # Which galaxy to plot?
+imsize = 100                     # (Half-)size of analysis region, in kpc
+nbins = 100                      # Number of bins for plotting
+ptype = 4                        # Look at stars here
+plot_range = [6.0, 9.5]
 plotloc = 'galaxy_remnants.png'  # Where to save the output plot?
 
 # Set up the simulation object for the run we're working with
@@ -43,8 +44,9 @@ def plot_log_sigma(snapshot_index, ax):
     # Set up a ReadRegion to extract star particles around the galaxy's
     # position in the current snapshot
     print("\nSetting up <parts> reader:")
+
     snapshot_file = sim.get_snap_file(snapshot_index)
-    parts = hy.ReadRegion(snapshot_file, ptype, gal_centre, imsize,
+    parts = hy.ReadRegion(snapshot_file, ptype, gal_centre, imsize/1e3,
                           shape='cube')
 
     # Get particle coordinates relative to subhalo centre (in kpc)

@@ -510,11 +510,13 @@ class ReadRegion(ReaderBase):
         """Identify members of a subhalo within the reader."""
         if subhalo_file is None:
             subhalo_file = self.subhalo_file
+
         subhalo = SplitFile(subhalo_file, 'Subhalo', read_index=subhalo_index)
         ids = SplitFile(subhalo_file, 'IDs',
                         read_range=(subhalo.SubOffset,
                                     subhalo.SubOffset+subhalo.SubLength))
-        ind_match, ind_matched = xr.find_id_indices(self.ParticleIDs, ids)
+        ind_match, ind_matched = xr.find_id_indices(self.ParticleIDs,
+                                                    ids.ParticleID)
         return ind_matched
 
     # --------------------------------------------------------------
