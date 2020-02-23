@@ -1,6 +1,4 @@
-"""
-Convenience routines for reading and writing data in HDF5 format
-"""
+"""Convenience routines for reading and writing data in HDF5 format."""
 
 import h5py as h5
 import numpy as np
@@ -329,7 +327,7 @@ def read_data(file_name, container, read_range=None, read_index=None,
         data_shape = f[container].shape
 
         # Over-write read_range if read_index is provided
-        if isinstance(read_index, int):
+        if np.isscalar(read_index):
             read_range = (read_index, read_index+1)
         elif read_index is not None:
             if len(read_index) > 0:
@@ -355,7 +353,7 @@ def read_data(file_name, container, read_range=None, read_index=None,
         f.close()
 
         # Apply final truncation if needed
-        if isinstance(read_index, int):
+        if np.isscalar(read_index):
             if data_out.ndim == 1:
                 data_out = data_out[0]
             else:
