@@ -175,6 +175,11 @@ FOF_DIMENSIONS = {
     'NumOfSubhalos': None
     }
 
+IDS_DIMENSIONS = {
+    'ParticleID': None,
+    'Particle_Binding_Energy': DIM_ENERGY
+    }
+
 PARTICLE_DIMENSIONS = {
     'AExpMaximumTemperature': None,
     'BH_AccretionLength': DIM_LENGTH,
