@@ -264,6 +264,14 @@ def get_dimensions(base_group, dataset_name):
             return None
         return dimension
 
+    elif base_group == 'IDs':
+        try:
+            dimension = IDS_DIMENSIONS[real_name]
+        except KeyError:
+            print(f"Unknown data set '{real_name}'!")
+            return None
+        return dimension
+
     else:
         print(f"No dimension information for group '{base_group}'...")
         return None
