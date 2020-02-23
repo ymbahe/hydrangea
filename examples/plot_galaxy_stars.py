@@ -14,6 +14,7 @@ galaxy_id = 10              # Which galaxy to plot?
 imsize = 100                 # (Half-)size of analysis region, in kpc
 nbins = 100                 # Number of bins for plotting
 ptype = 4                   # Look at stars here
+plot_range = []
 plotloc = 'galaxy_remnants.png'  # Where to save the output plot?
 
 # Set up the simulation object for the run we're working with
@@ -35,8 +36,8 @@ shi_ref = hy.hdf5.read_data(sim.fgt_loc, 'SHI',
                             read_index=galaxy_id)[ref_snapshot_index]
 
 
-def get_log_sigma(snapshot_index):
-    """Make a surface density map at a given snapshot."""
+def plot_log_sigma(snapshot_index, ax):
+    """Plot a surface density map at a given snapshot."""
     gal_centre = gal_positions[snapshot_index, :]
 
     # Set up a ReadRegion to extract star particles around the galaxy's
@@ -60,35 +61,25 @@ def get_log_sigma(snapshot_index):
                             weights=parts.Mass[ind_in_gal])[0]
              / ((imsize/nbins)**2))
 
-    return np.log10(sigma + 1e-15)
+    plt.sca(ax)
+    im = plt.imshow(np.log10(sigma + 1e-15),
+                    extent=[-imsize, imsize, -imsize, imsize],
+                    aspect='equal', interpolation='nearest',
+                    origin='lower', alpha=1.0, cmap=plt.cm.inferno,
+                    vmin=plot_range[0], vmax=plot_range[1])
+
+    return im
 
 
-log_sigma_1 = get_log_sigma(first_snapshot_index)
-log_sigma_2 = get_log_sigma(second_snapshot_index)
+im = plot_log_sigma(first_snapshot_index, ax1)
+im = plot_log_sigma(second_snapshot_index, ax2)
 
-# Plot the surface densities, in log scale
-ind_good = np.nonzero(log_sigma_1 >= -14)
-vmin, vmax = np.percentile(log_sigma_1[ind_good], [0.01, 99.9])
-
-plt.sca(ax1)
-im = plt.imshow(log_sigma_1,
-                extent=[-imsize, imsize, -imsize, imsize],
-                aspect='equal', interpolation='nearest',
-                origin='lower', alpha=1.0, cmap=plt.cm.inferno,
-                vmin=vmin, vmax=vmax)
-
-plt.sca(ax2)
-im = plt.imshow(log_sigma_2,
-                extent=[-imsize, imsize, -imsize, imsize],
-                aspect='equal', interpolation='nearest',
-                origin='lower', alpha=1.0, cmap=plt.cm.inferno,
-                vmin=vmin, vmax=vmax)
 
 # Add a colour bar on the right side
-ax2 = fig.add_axes([0.91, 0.15, 0.02, 0.8])
-ax2.set_xticks([])
-ax2.set_yticks([])
-cbar = plt.colorbar(im, cax=ax2, orientation='vertical')
+ax3 = fig.add_axes([0.91, 0.15, 0.02, 0.8])
+ax3.set_xticks([])
+ax3.set_yticks([])
+cbar = plt.colorbar(im, cax=ax3, orientation='vertical')
 fig.text(0.95, 0.5, r'log$_{10}$ ($\Sigma$ [M$_\odot$ kpc$^{-2}$])',
          rotation=90.0, va='center', ha='left')
 
