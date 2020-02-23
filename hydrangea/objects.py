@@ -56,11 +56,11 @@ class Simulation:
 
     def get_snap_file(self, index):
         """Shorthand alias for get_snapshot_file()."""
-        self.get_snapshot_file(self, index)
+        self.get_snapshot_file(index)
 
     def get_snip_file(self, index):
         """Shorthand alias for get_snipshot_file()."""
-        self.get_snipshot_file(self, index)
+        self.get_snipshot_file(index)
 
 
 class Cantor:
