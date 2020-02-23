@@ -191,6 +191,19 @@ class SplitFile(ReaderBase):
 
         return data_out
 
+    def in_subhalo(self, subhalo_index, subhalo_file=None):
+        """Identify members of a subhalo within the reader."""
+        if subhalo_file is None:
+            subhalo_file = self.subhalo_file
+
+        subhalo = SplitFile(subhalo_file, 'Subhalo', read_index=subhalo_index)
+        ids = SplitFile(subhalo_file, 'IDs',
+                        read_range=(subhalo.SubOffset,
+                                    subhalo.SubOffset+subhalo.SubLength))
+        ind_match, ind_matched = hx.find_id_indices(self.ParticleIDs,
+                                                    ids.ParticleID)
+        return ind_matched
+
     def _read_files_direct(self, dataset_name, verbose=1, trial=False,
                            data_type=None):
         """Read data set from files using pre-established offset list."""
