@@ -40,7 +40,9 @@ class Simulation:
         self.galaxy_path_loc = self.high_level_dir + 'GalaxyPaths.hdf5'
         self.spider_loc = self.high_level_dir + 'SpiderwebTables.hdf5'
         self.sh_extra_loc = self.high_level_dir + 'SubhaloExtra.hdf5'
-
+        self.interpolation_loc = (self.high_level_dir
+                                  + 'GalaxyCoordinates10Myr.hdf5')
+        
     def get_snapshot_file(self, index):
         """Form the (first) file of a given snapshot."""
         return hy.form_files(self.run_dir, index, types='snap')
