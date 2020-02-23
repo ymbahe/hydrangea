@@ -23,7 +23,7 @@ sim = hy.Simulation(index=sim_index)
 
 # Set up the figure
 fig = plt.figure(figsize=(8/0.9, 4))
-ax1 = fig.add_axes([0.07, 0.15, 0.4, 0.8])
+ax1 = fig.add_axes([0.09, 0.15, 0.4, 0.8])
 ax2 = fig.add_axes([0.5, 0.15, 0.4, 0.8])
 
 # Form the (first) files of the required subfind and snapshot catalogues,
@@ -76,13 +76,23 @@ def plot_log_sigma(snapshot_index, ax):
 im = plot_log_sigma(first_snapshot_index, ax1)
 im = plot_log_sigma(second_snapshot_index, ax2)
 
+# Add some embellishments to plot
+ax1.set_xlim((-imsize, imsize))
+ax1.set_ylim((-imsize, imsize))
+ax2.set_xlim((-imsize, imsize))
+ax2.set_ylim((-imsize, imsize))
+
+ax1.set_xlabel(r'$\Delta x$ [kpc]')
+ax1.set_ylabel(r'$\Delta y$ [kpc]')
+ax2.set_xlabel(r'$\Delta x$ [kpc]')
+ax2.set_yticks([], [])
 
 # Add a colour bar on the right side
-ax3 = fig.add_axes([0.91, 0.15, 0.02, 0.8])
+ax3 = fig.add_axes([0.9, 0.15, 0.02, 0.8])
 ax3.set_xticks([])
 ax3.set_yticks([])
 cbar = plt.colorbar(im, cax=ax3, orientation='vertical')
-fig.text(0.95, 0.5, r'log$_{10}$ ($\Sigma$ [M$_\odot$ kpc$^{-2}$])',
+fig.text(0.96, 0.55, r'log$_{10}$ ($\Sigma$ [M$_\odot$ kpc$^{-2}$])',
          rotation=90.0, va='center', ha='left')
 
 # Save the figure
