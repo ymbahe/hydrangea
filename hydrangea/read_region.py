@@ -506,6 +506,17 @@ class ReadRegion(ReaderBase):
             weights = self.read_data(weight_quant, units=units)
             return np.average(data, weights=weights, axis=0)
 
+    def in_subhalo(self, subhalo_index, subhalo_file=None):
+        """Identify members of a subhalo within the reader."""
+        if subhalo_file is None:
+            subhalo_file = self.subhalo_file
+        subhalo = SplitFile(subhalo_file, 'Subhalo', read_index=subhalo_index)
+        ids = SplitFile(subhalo_file, 'IDs',
+                        read_range=(subhalo.SubOffset,
+                                    subhalo.SubOffset+subhalo.SubLength))
+        ind_match, ind_matched = xr.find_id_indices(self.ParticleIDs, ids)
+        return ind_matched
+
     # --------------------------------------------------------------
     # ----------- INTERNAL-ONLY FUNCTIONS BELOW --------------------
     # --------------------------------------------------------------
