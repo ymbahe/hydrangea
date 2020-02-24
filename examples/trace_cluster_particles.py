@@ -1,10 +1,19 @@
-"""Demonstration script to trace particles between two snapshots."""
+"""Demonstration script to trace particles between two snapshots.
+
+It selects particles from the central region of a cluster at z = 0,
+traces them back to z ~ 1, and then plots the temperature-density phase
+diagram at this snapshot.
+
+It illustrates using the SplitFile and ReadRegion reader objects, and the
+find_id_indices() function to match particles between two outputs.
+"""
 
 # Import required packages
 import numpy as np
 import hydrangea as hy
 import matplotlib.pyplot as plt
 import sys
+import time
 from pdb import set_trace
 
 # Set script parameters
@@ -12,9 +21,9 @@ sim_index = 0                   # Which simulation do we want?
 snap_index_ref = 29             # Snapshot for particle selection (z = 0)
 snap_index_plot = 11            # Which snapshot to analyse? (z ~ 1)
 sel_size = 0.2                  # Selection radius of particles, in r500c
-temp_range = [2.5, 9.0]         # Plot range in (log) temperature [K]
-nH_range = [-9.0, 3.0]          # Plot range in (log) nH [cm^-3]
-scale_range = [9.0, 14.5]       # Scale range of plot
+temp_range = [3.0, 8.5]         # Plot range in (log) temperature [K]
+nH_range = [-6.0, 3.0]          # Plot range in (log) nH [cm^-3]
+scale_range = [8.5, 12.0]       # Scale range of plot
 nbins = 100                     # Number of bins per axis
 plotloc = 'cluster_origin.png'  # Where to save the output plot?
 
@@ -34,7 +43,9 @@ snapshot_file_plot = sim.get_snap_file(snap_index_plot)
 fof_cl = hy.SplitFile(subfind_file_ref, 'FOF', read_index=0)
 
 # Set up a reader to select gas particles within the desired aperture
-# around the cluster centre at z = 0
+# around the cluster centre at z = 0. This can be used largely in the same
+# way as the SplitFile instance <fof_cl>, but reads entries from the
+# particle catalogue instead.
 gas_ref = hy.ReadRegion(snapshot_file_ref, 0, fof_cl.GroupCentreOfPotential,
                         sel_size * fof_cl.Group_R_Crit500, exact=True)
 
@@ -49,15 +60,21 @@ gas_plot = hy.SplitFile(snapshot_file_plot, part_type=0)
 # Now we need to identify the particles in the plot snapshot that were
 # in the selected region in the ref snapshot. Here, we use the
 # find_id_indices functtion; we could also have used the Gate class
-# as in the snipshot_stellar_age.py example.
-
-print(f"\nMatching particles between snaps {snap_index_ref} and "
-      f"{snap_index_plot}, also reading ParticleIDs...")
+# as in the snipshot_stellar_age.py example. It returns two arrays:
+# ind_in_plot, the indices of the particles in the plot snapshot (z ~ 1),
+# in the same order as they are read in by the (z = 0) reader, and
+# ind_matched, a list of all particles that could be matched.
+start_time = time.time()
+print(f"\nMatching particles between snaps {snap_index_ref} "
+      f"(z = {gas_ref.redshift:.2f}) and {snap_index_plot} "
+      f"(z = {gas_plot.redshift:.2f});\n"
+      "this will also read the ParticleIDs...")
 ind_in_plot, ind_matched = hy.crossref.find_id_indices(gas_ref.ParticleIDs,
                                                        gas_plot.ParticleIDs)
+print(f"Matching took {time.time() - start_time:.3f} sec.")
 
-# ind_matched lists all particles that could be matched. This should be
-# all, but let's check to be sure:
+# Because all gas particles that are there at z = 0 were also in all
+# earlier snapshots, we should have matched all particles, but best be sure:
 if len(ind_matched) != len(ind_in_plot):
     print(f"Problem: could only match {len(ind_matched)} out of "
           f"{len(ind_in_plot)} particles. Please investigate.")
@@ -72,6 +89,7 @@ ax1 = fig.add_axes([0.12, 0.15, 0.65, 0.8])
 
 # Create the 2D histogram. The particle temperatures, densities, and
 # masses are read in implicitly as they are being accessed.
+print("\nCreating histogram, also reading in required data sets...")
 histogram, xe, ye = np.histogram2d(
     np.log10(gas_plot.Temperature[ind_in_plot]),
     np.log10(gas_plot.Density[ind_in_plot]),
