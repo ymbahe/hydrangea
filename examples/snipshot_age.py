@@ -2,12 +2,12 @@
 
 The example here is how to obtain the stellar formation time in a snipshot,
 for which this information is not written out. This is essentially a more
-complex version of the find_particles_near_subhalo.py example, which you
-may want to have a look at first.
+complex version of the star_density.py example, which you may want to have
+a look at first.
 
 This script also demonstrates some basic approaches for working with snipshots
-in general (viz. finding the right one, finding galaxy positions)."""
-
+in general (viz. finding the right one, finding galaxy positions).
+"""
 # Import required packages
 import numpy as np
 import hydrangea as hy

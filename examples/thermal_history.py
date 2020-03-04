@@ -1,4 +1,9 @@
-"""Demonstration script to plot the thermal history of a gas particle."""
+"""Demonstration script to plot the thermal history of one gas particle.
+
+It illustrates using the snipshots for high time resolution tracking,
+and the SplitFile and ReadRegion classes for reading in (parts of)
+a particle catalogue.
+"""
 
 # Import required packages
 import numpy as np
@@ -92,7 +97,7 @@ for isnep in range(n_snep):
         # data is accessed in exactly the same way for both, so we do not
         # need to distinguish between these cases here
         ind_target = np.nonzero(gas.ParticleIDs == particle_id)[0]
-        
+
         # Check whether we found the particle
         if len(ind_target) > 0:
             break
@@ -106,7 +111,7 @@ for isnep in range(n_snep):
         # Did not find the particle? Need to try a larger search radius
         search_rad *= 1.5
 
-    # End of loop. Make sure we found exactly one particle with this ID        
+    # End of loop. Make sure we found exactly one particle with this ID
     if len(ind_target) != 1:
         print(f"Unexpectedly found {len(ind_target)} particles with "
               f"ID {particle_id}. Something is badly wrong...")
@@ -126,7 +131,7 @@ for isnep in range(n_snep):
     else:
         gas_part = gas
         ind_read = ind_target
-        
+
     # Write out its properties into the respective arrays. They are loaded
     # in the background, only for the particle we care about. Since we have
     # not specified a unit system when setting up <gas_part>, dimensional
@@ -138,7 +143,6 @@ for isnep in range(n_snep):
     densities[isnep] = gas_part.Density[ind_read]
     previous_pos = gas_part.read_data(
         'Coordinates', units='data')[ind_read, :]
-    
 # Plot the quantities
 plt.plot(np.log10(densities), np.log10(temperatures),
          color='grey', linewidth=0.5, linestyle=':')

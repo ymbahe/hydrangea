@@ -2,10 +2,10 @@
 
 Quantities are read in both from the Subfind catalogues (slow, but works for
 all data) and from the pre-compiled high-level tables (faster, but only for
-a subset of data). 
+a subset of data).
 
 This script demonstrates using the HDF5 utilities to read/write data
-sets and attributes from/to a single file, and the SplitFile reader for 
+sets and attributes from/to a single file, and the SplitFile reader for
 handling catalogues split over multiple files.
 """
 
@@ -56,7 +56,7 @@ subfind_file = sim.get_subfind_file(snap_index)
 # Set up a reader for the subhalo catalogue. From this, we can access all
 # subhalo properties as attributes of <subhalo>; they are loaded when first
 # required. By default, quantities are returned in 'astronomically sensible'
-# units (e.g. Mpc, Gyr, km/s). 
+# units (e.g. Mpc, Gyr, km/s).
 print("Setting up <subhalo> reader:")
 subhalo = hy.SplitFile(subfind_file, 'Subhalo')
 
@@ -139,5 +139,3 @@ hy.hdf5.write_data(saveloc, "StarFormationRates", sfr,
 # Let's also write out the redshift as an attribute to StellarMasses:
 hy.hdf5.write_attribute(saveloc, "StellarMasses", "Redshift",
                         subhalo.redshift)
-
-

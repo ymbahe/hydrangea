@@ -1,4 +1,7 @@
-"""Demonstration script to plot the stellar mass growth of one galaxy.
+"""Demonstration script to trace the evolution of one galaxy.
+
+It generates a plot of the stellar mass and metallicity of the galaxy
+throughout cosmic time, including its progenitors.
 
 This is an example of how to use information in the high-level tables
 and SpiderWeb catalogue to trace the evolution of a galaxy. It also
@@ -12,9 +15,9 @@ import matplotlib.pyplot as plt
 from astropy.cosmology import Planck13
 
 # Set script parameters
-sim_index = 0                # Which simulation do we want?
-galaxy_id = 7679             # Which galaxy should we follow?
-plotloc = 'mass_growth.png'  # Where to save the output plot?
+sim_index = 0                     # Which simulation do we want?
+galaxy_id = 7679                  # Which galaxy should we follow?
+plotloc = 'galaxy_evolution.png'  # Where to save the output plot?
 
 # Prepare the plot
 fig = plt.figure(figsize=(5.2, 4))

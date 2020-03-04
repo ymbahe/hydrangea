@@ -44,7 +44,7 @@ gas = hy.SplitFile(snapshot_file, part_type=0)
 # Get all particles within 10r200 from the cluster centre
 # (i.e. in the well-resolved region). Note that we could also have set up
 # a ReadRegion around the cluster centre, as demonstrated in the example
-# 'find_particles_near_subhalo.py' to read particles within this sphere.
+# 'star_density.py', to read particles within this sphere.
 ind_select = np.nonzero(
     np.linalg.norm(gas.Coordinates - fof_cl.GroupCentreOfPotential[None, :],
                    axis=1) <= 10.0*fof_cl.Group_R_Crit200)[0]

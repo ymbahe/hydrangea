@@ -1,4 +1,12 @@
-"""Demonstration script to find particles belonging to a particular galaxy."""
+"""Demonstration script to find particles belonging to a particular galaxy.
+
+It generates two plots of the same galaxy: one of its star particles in
+a first snapshot, and a second of the same particles in a later snapshot,
+after the galaxy has begun to be stripped.
+
+This example illustrates reading in particle data from a small volume
+with ReadRegion, and testing for subhalo membership with in_subhalo().
+"""
 
 # Import required packages
 import numpy as np
@@ -16,7 +24,7 @@ imsize = 100                     # (Half-)size of analysis region, in kpc
 nbins = 100                      # Number of bins for plotting
 ptype = 4                        # Look at stars here
 plot_range = [6.0, 9.5]
-plotloc = 'galaxy_remnants.png'  # Where to save the output plot?
+plotloc = 'galaxy_stars.png'     # Where to save the output plot?
 
 # Set up the simulation object for the run we're working with
 sim = hy.Simulation(index=sim_index)
