@@ -1,1 +1,10 @@
-h5py
+astropy==4.0
+certifi==2019.11.28
+chardet==3.0.4
+h5py==2.10.0
+idna==2.9
+numpy==1.18.1
+requests==2.23.0
+scipy==1.4.1
+six==1.14.0
+urllib3==1.25.8
