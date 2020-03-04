@@ -3,15 +3,15 @@
 import h5py as h5
 import numpy as np
 import os
-from pdb import set_trace
 
-def check_attribute(fileName, container, attribute):
+
+def test_attribute(file_name, container, attribute):
     """
-    Check whether an HDF5 attribute exists.
+    Test whether an HDF5 attribute exists.
 
     Parameters
     ----------
-    fileName : string
+    file_name : string
         The path to the HDF5 file to test.
     container : string
         The container (group or dataset) in which the attribute's presence is
@@ -22,11 +22,11 @@ def check_attribute(fileName, container, attribute):
     Returns
     -------
     bool
-        True if the attribute exists, False if it does not. If the container
-        or file does not exist, status is also False.
+        ``True`` if the attribute exists, ``False`` if it does not. If
+        the container or file does not exist, ``False`` is also returned.
     """
     try:
-        f = h5.File(fileName, 'r')
+        f = h5.File(file_name, 'r')
         container = f[container]
         status = attribute in container.attrs.keys()
     except KeyError:
@@ -34,13 +34,13 @@ def check_attribute(fileName, container, attribute):
     return status
 
 
-def check_dataset(fileName, dataset):
+def test_dataset(file_name, dataset):
     """
-    Check whether a specified dataset exists in an HDF5 file.
+    Test whether a specified dataset exists in an HDF5 file.
 
     Parameters
     ----------
-    fileName : string
+    file_name : string
         The path to the HDF5 file to test.
     dataset : string
         The data set to test, including possible containing groups
@@ -49,24 +49,24 @@ def check_dataset(fileName, dataset):
     Returns
     -------
     bool
-        True if fileName is an HDF5 file and contains the specified
-        data set. False otherwise.
+        ``True`` if file_name is an HDF5 file and contains the specified
+        data set. ``False`` otherwise.
     """
     try:
-        f = h5.File(fileName, 'r')
+        f = h5.File(file_name, 'r')
         d = f[dataset]
     except KeyError:
         return False
     return isinstance(d, h5.Dataset)
 
 
-def check_group(fileName, group):
+def test_group(file_name, group):
     """
-    Check whether a specified group exists in an HDF5 file.
+    Test whether a specified group exists in an HDF5 file.
 
     Parameters
     ----------
-    fileName : string
+    file_name : string
         The path to the HDF5 file to test.
     group : string
         The group to test, including possible containing groups
@@ -75,11 +75,11 @@ def check_group(fileName, group):
     Returns
     -------
     bool
-        True if `fileName' is an HDF5 file and contains the specified
-        group. False otherwise.
+        ``True`` if `file_name` is an HDF5 file and contains the specified
+        group. ``False`` otherwise.
     """
     try:
-        f = h5.File(fileName, 'r')
+        f = h5.File(file_name, 'r')
         d = f[group]
     except KeyError:
         return False
@@ -104,21 +104,21 @@ def write_attribute(file_name, container, att_name, value,
     value : scalar, np.array, or string
         The variable to write as HDF5 attribute.
     new : bool, optional
-        If a file with the specified fileName already exists, rename it to
-        'fileName.old' and start a new file containing only an (empty)
-        container with this attribute. Default: False.
+        If a file with the specified file_name already exists, rename it to
+        'file_name.old' and start a new file containing only an (empty)
+        container with this attribute. Default: ``False``.
     group : bool, optional
-        If the specified container does not exist, create it as a group (True,
-        default) or (empty) data set (False).
+        If the specified container does not exist, create it as a group
+        (if ``True``, default) or (empty) data set (``False``).
     update : bool, optional
         First check whether the attribute already exists, and update it if so
-        (default). If False, a pre-existing attribute with the same name
+        (default). If ``False``, a pre-existing attribute with the same name
         is not altered, and the input value not added to the file.
 
     Note
     ----
     If the specified variable is a string, it is first converted to
-    type np.string_, in order to be acceptable as HDF5 attribute.
+    type ``np.string_``, in order to be acceptable as HDF5 attribute.
 
     """
     # Convert None and string to HDF5-acceptable values
@@ -176,8 +176,8 @@ def write_data(file_name, container, array,
     array : np.array
         The numpy array to write to an HDF5 file (can be of any data type).
     new : bool, optional
-        If a file with the specified fileName already exists, rename it to
-        'fileName.old' and start a new file. Default: False.
+        If a file with the specified file_name already exists, rename it to
+        'file_name.old' and start a new file. Default: False.
     comment : string, optional
         Comment text to describe the content of the data set; written as an
         HDF5 attribute 'Comment' to the data set. If None (default), no
@@ -255,13 +255,13 @@ def read_attribute(file_name, container, att_name,
         The name of the attribute to read from the specified container.
     default : scalar, np.array, or string
         A default value to return if the attribute (or its container, or the
-        file) does not exist. Default: None
+        file) does not exist. Default: ``None``
     require : bool
         Raise an exception if the attribute does not exist. If False
-        (default), the 'default' value is returned instead.
+        (default), the `default` value is returned instead.
     convert_string : bool
-        Convert an attribute of type np.string_ to a standard string.
-        Default: True
+        Convert an attribute of type ``np.string_`` to a standard string.
+        Default: ``True``
 
     Returns
     -------
@@ -290,34 +290,38 @@ def read_data(file_name, container, read_range=None, read_index=None,
     """
     Read one dataset from an HDF5 file.
 
-    Optionally, only a section of the data set may be read.
+    Optionally, only a section of the dataset may be read, as specified
+    by the `read_range`, `read_index`, and `index_dim` parameters.
 
     Parameters
     ----------
     file_name : string
-        The HDF5 file to read the data set from.
+        The HDF5 file to read the dataset from.
     container : string
-        The name of the data set, including possibly containing groups
+        The name of the dataset, including possibly containing groups
         (e.g. 'well/nested/group/data').
-    read_range : (int, int) or None, optional
+    read_range : (int, int) or ``None``, optional
         Read only elements from the first up to *but excluding* the
-        second entry in the tuple (in dimension 0). If None (default),
-        read the entire file. Ignored if read_index is provided.
-    read_index : int or np.array(int) or None, optional
-        Read only the elements in read_index (in dimension 0). If int,
-        a single element is read, and the first dimension truncated. If
-        an array is provided, the elements between the lowest and
+        second entry in the tuple (in dimension `index_dim`). If ``None``
+        (default), read the entire file. Ignored if `read_index` is
+        provided.
+    read_index : int or np.array(int) or ``None``, optional
+        Read only the specified element(s), in dimension `index_dim`. If
+        `int`, a single element is read, and the first dimension truncated.
+        If an array is provided, the elements between the lowest and
         highest index are read and the output then masked to the
-        exact elements. If None (default), everything is read.
+        exact elements. If ``None`` (default), everything is read.
     index_dim : int, optional
-        Dimension over which to apply the read cuts (default: 0).
+        Dimension over which to apply the read cuts specified by
+        `read_range` or `read_index` (default: 0).
     require : bool, optional
         Require the presence of the data set, and raise an exception if it
-        does not exist. If False (default), return None.
+        does not exist. If ``False`` (default), return ``None`` in this
+        case.
 
     Returns
     -------
-    np.array (type and dimensions as data set).
+    np.array (type and dimensions as dataset).
 
     """
     try:
@@ -391,8 +395,8 @@ def attrs_to_dict(file_name, container):
     dict
         Dictionary of 'Attribute name' : 'Attribute value'
 
-    Notes
-    -----
+    Note
+    ----
     An exception is raised if the container does not exist. If there are
     no attributes attached to the container, an empty dict is returned.
 
@@ -418,7 +422,7 @@ def list_datasets(file_name, group=None):
 
     Parameters
     ----------
-    fileName : string
+    file_name : string
         The path to the HDF5 file whose data sets should be listed.
     group : string, optional
         The group in which to look for data sets (default: None, i.e.
