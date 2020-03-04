@@ -13,64 +13,60 @@ import time
 
 
 class SplitFile(ReaderBase):
-    """Class to read data sets that are split over multiple files.
+    """Class to read catalogues that are split over multiple files.
+
+    Parameters
+    ----------
+    file_name : str
+        Any one of the files in the collection to read.
+    group_name : str, optional
+        Name of base group to read from. If not provided, it is
+        assumed to be 'PartType[x]', where x is the particle type
+        (which must then be supplied).
+    part_type : int, optional
+        The (numerical) particle type; only relevant for sn[a/i]pshots.
+        If not provided, it is inferred from group_name, which must
+        then be supplied.
+    sim_type : str, optional
+        Type of simulation to which this data belongs:
+        'Eagle' (default) or 'Illustris'. The latter is an experimental
+        feature to read data from the Illustris[TNG] simulation family
+        with this library.
+    verbose : int, optional
+        Specify level of log output, from 0 (minimal) to 2 (lots).
+        Default: 1.
+    units : str or None, optional
+        Convert values to other units (default: 'astro'; capitalization
+        is ignored). With 'data', no conversion is done.
+    read_range : (int, int) or None, optional
+        Read only elements from the first up to *but excluding* the
+        second entry in the tuple. If None (default), load entire
+        catalogue. Ignored if read_index is provided.
+    read_index : int or np.array(int) or None, optional
+        Read only the elements in read_index. If int, a single
+        element is read, and the first dimension truncated. If
+        an array is provided, the elements between the lowest and
+        highest index are read and the output then masked to the
+        exact elements. If None (default), everything is read.
 
     Attributes
     ----------
-    file_name : str
-        Name of one of the files in this split collection.
-    group_name : str or None
-        Base group to read data from (None if not specified)
     num_elem : int or None
         Number of elements in the selected group category (None if it
         could not be determined or is not applicable).
     num_files : int or None
         Number of files in the collection (None if not determined).
+
+    Note
+    ----
+    For proper functionality, `read_range` requires that the file
+    offsets be determined. If this is not possible, the entire
+    data set will be read and then truncated (slower).
     """
 
     def __init__(self, file_name, group_name=None, part_type=None,
                  sim_type='Eagle', verbose=1, units='astro', read_range=None,
                  read_index=None):
-        """Initialize a file collection to read from.
-
-        Parameters
-        ----------
-        file_name : str
-            Any one of the files in the collection to read.
-        group_name : str, optional
-            Name of base group to read from. If not provided, it is
-            assumed to be 'PartType[x]', where x is the particle type
-            (which must then be supplied).
-        part_type : int, optional
-            The (numerical) particle type; only relevant for sn[a/i]pshots.
-            If not provided, it is inferred from group_name, which must
-            then be supplied.
-        sim_type : str, optional
-            Type of simulation to which this data belongs:
-            'Eagle' (default) or 'Illustris'.
-        verbose : int, optional
-            Specify level of log output, from 0 (minimal) to 2 (lots).
-            Default: 1.
-        units : str or None, optional
-            Convert values to other units (default: 'astro'; capitalization
-            is ignored). With 'data', no conversion is done.
-        read_range : (int, int) or None, optional
-            Read only elements from the first up to *but excluding* the
-            second entry in the tuple. If None (default), load entire
-            catalogue. Ignored if read_index is provided.
-        read_index : int or np.array(int) or None, optional
-            Read only the elements in read_index. If int, a single
-            element is read, and the first dimension truncated. If
-            an array is provided, the elements between the lowest and
-            highest index are read and the output then masked to the
-            exact elements. If None (default), everything is read.
-
-        Note
-        ----
-        For proper functionality, read_range requires that the file
-        offsets be determined. If this is not possible, the entire
-        data set will be read and then truncated (slower).
-        """
         self.verbose = verbose
         self.units = units.lower()
         self.read_index = read_index
@@ -192,9 +188,26 @@ class SplitFile(ReaderBase):
         return data_out
 
     def in_subhalo(self, subhalo_index, subhalo_file=None):
-        """Identify members of a subhalo within the reader."""
+        """Identify members of a subhalo within the catalogue selection.
+
+        Parameters
+        ----------
+        subhalo_index : int
+            The index of the subhalo against which to test particles for
+            membership.
+        subhalo_file : str or None, optional
+            A file from the subfind catalogue containing the subhalo.
+            If None (default), the file specified by the
+            :attr:`subfind_file` attribute is used.
+
+        Note
+        ----
+        This method internally reads and matches data betweeen this
+        catalogue and the associated subhalo catalogue; this may take
+        some time if there are many particles in either.
+        """
         if subhalo_file is None:
-            subhalo_file = self.subhalo_file
+            subhalo_file = self.subfind_file
 
         subhalo = SplitFile(subhalo_file, 'Subhalo', read_index=subhalo_index)
         ids = SplitFile(subhalo_file, 'IDs',
@@ -417,10 +430,12 @@ class SplitFile(ReaderBase):
 
     @property
     def num_elem(self):
-        """Find out how many output elements there are in total.
+        """Number of catalogue entries to read.
 
-        Note that, with read_range set up, this is the total number
-        of elements in this range, not in the total catalogue.
+        With `read_range` set up (including implicitly through
+        `read_index`), this gives the total number of elements in this
+        range, not in the total catalogue. ``None`` if it could not be
+        determined.
         """
         if '_num_elem' not in dir(self):
             self._print(2, "Load total number of elements...")
@@ -562,7 +577,7 @@ class SplitFile(ReaderBase):
 
     @property
     def num_files(self):
-        """Count number of files in the data set."""
+        """Number of files in the catalogue."""
         if '_num_files' not in dir(self):
             self._print(2, "Loading file offsets...")
             if self.sim_type == 'Eagle':
@@ -579,7 +594,13 @@ class SplitFile(ReaderBase):
 
     @property
     def file_offsets(self):
-        """List offset of each file in total data set."""
+        """Offset (index of first entry) of each file in the catalogue.
+
+        Note
+        ----
+        This is currently ``None`` if the whole catalogue is to be read.
+        The motivation for this is not entirely clear...
+        """
         if self.read_range is None:
             return None
         if '_file_offsets' not in dir(self):
