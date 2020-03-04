@@ -41,7 +41,7 @@ Once you have downloaded (or updated) the repository, it can be installed with t
 
 #. Install the hydrangea package in your python installation::
    
-   $ pip install --user .
+   $ pip install -r requirements.txt --user .
 
 You can now import the library in any python script by adding the line::
 
