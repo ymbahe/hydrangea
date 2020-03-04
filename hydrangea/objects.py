@@ -12,11 +12,31 @@ BASE_DIR = hy.local.BASE_DIR
 
 
 class Simulation:
-    """Representation of one simulation."""
+    """Representation of one simulation, for path handling.
 
-    def __init__(self, run_dir=None, index=None, base_dir=BASE_DIR,
+    Parameters
+    ----------
+    index : int or None, optional
+        The index of the simulation. If None (default), `run_dir`
+        must be specified.
+    run_dir : str or None, optional
+        The base directory of the simulation. If None (default), it
+        is constructed internally from the other parameters.
+    base_dir : str or None, optional
+        The base directory of the local data repository. If None
+        (default), `run_dir` must be specified.
+    sim_type : str or None, optional
+        Type of simulation ('HYDRO' or 'DM', case-insensitive). If
+        None (default), `run_dir` must be specified.
+    suite_name : str, optional
+        Suite from which to draw the simulation from. Options are
+        '10r200' (default), '5r200', '10r200_only', and '5r200_only'.
+        The '..._only' options do not switch to the other suite for
+        simulations that are not part of the selected suite.
+    """
+
+    def __init__(self, index=None, run_dir=None, base_dir=BASE_DIR,
                  sim_type='Hydro', suite_name='10r200'):
-        """Object constructor."""
         if run_dir is None:
             if base_dir is None or index is None:
                 print("You need to specify either run_dir or "
@@ -42,26 +62,60 @@ class Simulation:
         self.sh_extra_loc = self.high_level_dir + 'SubhaloExtra.hdf5'
         self.interpolation_loc = (self.high_level_dir
                                   + 'GalaxyCoordinates10Myr.hdf5')
-        
+
     def get_snapshot_file(self, index):
-        """Form the (first) file of a given snapshot."""
+        """Form the (first) file of a given snapshot particle catalogue.
+
+        Parameters
+        ----------
+        index : int
+            The index of the snapshot for which to form the file.
+
+        Returns
+        -------
+        file_path : str
+            The path to the first file of the specified snapshot catalogue.
+        """
         return hy.form_files(self.run_dir, index, types='snap')
 
     def get_subfind_file(self, index):
-        """Form the (first) file of a given subfind catalogue."""
+        """Form the (first) file of a given subfind catalogue.
+
+        Parameters
+        ----------
+        index : int
+            The index of the snapshot whose subfind catalogue file should
+            be formed.
+
+        Returns
+        -------
+        file_path : str
+            The path to the first file of the specified catalogue.
+        """
         return hy.form_files(self.run_dir, index, types='sub')
 
     def get_snipshot_file(self, index):
-        """Form the (first) file of a given snipshot."""
+        """Form the (first) file of a given snipshot particle catalogue.
+
+        Parameters
+        ----------
+        index : int
+            The index of the snipshot for which to form the file.
+
+        Returns
+        -------
+        file_path : str
+            The path to the first file of the specified catalogue.
+        """
         return hy.form_files(self.run_dir, index, types='snap',
                              snep_type='snip')
 
     def get_snap_file(self, index):
-        """Shorthand alias for get_snapshot_file()."""
+        """Shorthand alias for :meth:`get_snapshot_file`."""
         return self.get_snapshot_file(index)
 
     def get_snip_file(self, index):
-        """Shorthand alias for get_snipshot_file()."""
+        """Shorthand alias for :meth:`get_snipshot_file`."""
         return self.get_snipshot_file(index)
 
 
