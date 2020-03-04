@@ -272,8 +272,8 @@ def get_m_baryon(file_name, units='astro'):
 def ind_to_block(indices, offsets, lengths=None):
     """Find the block for a set of indices in an offset-separated list.
 
-    Each block i contains elements from indices offsets[i] up to and
-    including offsets[i]+length[i]-1. This can, for example, be used to
+    Each block i contains elements from indices `offsets[i]` up to and
+    including `offsets[i]`+`length[i]-1`. This can, for example, be used to
     translate particle indices in a Subfind-ID list into the corresponding
     subhalo or FOF index.
 
@@ -284,9 +284,9 @@ def ind_to_block(indices, offsets, lengths=None):
     offsets : ndarray(int)
         The index of the first element in each block.
     lengths : ndarray(int), optional
-        The number of elements in each block. If None (default), it is
+        The number of elements in each block. If ``None`` (default), it is
         assumed that the blocks are contiguous, i.e. all elements between
-        offsets[i] and offsets[i+1] belong to block i.
+        `offsets[i]` and `offsets[i+1]` belong to block `i`.
 
     Returns
     -------
@@ -295,8 +295,8 @@ def ind_to_block(indices, offsets, lengths=None):
 
     Note
     ----
-    When lengths is not provided, it is advisable to append a `coda'
-    to offsets, i.e. a trailing entry with the total number of elements
+    When lengths is not provided, it is advisable to append a "coda"
+    to `offsets`, i.e. a trailing entry with the total number of elements
     assigned to blocks. This enables the correct identification of
     (potential) input elements beyond the range of the last block.
 
@@ -339,11 +339,13 @@ def form_files(sim_dir, index, types='sub', snep_type='snap'):
     types : string or list of strings, optional
         The type(s) of output for which to construct file names. Can be
         one or more of the following (separate by space if multiple):
-            'sub'     --> Subfind subhalo catalogue (default)
-            'snap'    --> Raw snapshot
-            'fof'     --> Subfind FOF catalogue
-            'subpart' --> Subfind particle catalogue
-            'partmag' --> Magnitudes of star particles (Hydrangea only)
+
+        - ``'sub'`` : Subfind subhalo catalogue (default)
+        - ``'snap'`` : Raw snapshot
+        - ``'fof'`` : Subfind FOF catalogue
+        - ``'subpart'`` : Subfind particle catalogue
+        - ``'partmag'`` : Magnitudes of star particles (Hydrangea only)
+
     snep_type : string, optional
         Snepshot type to construct file(s) for: 'snap[shot]' (default)
         or 'snip[shot]' (both short and long forms accepted, capitalization
