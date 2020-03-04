@@ -61,9 +61,8 @@ Other
 
 Useful links
 ------------
-* `Hydrangea/C-EAGLE simulation website <https://hydrangea.mpcdf.mpg.de>`_
-* `Description of Hydrangea/C-EAGLE simulation data <https://hydrangea.mpcdf.mpg.de/data_doc/index.html>`_
-* `Nomenclature reference <https://hydrangea.mpcdf.mpg.de/data_doc/nomenclature.html>`_
+
+Coming soon...
 
 
 
