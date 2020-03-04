@@ -1,4 +1,4 @@
-"""Example script to demostrate reading in subhalo/galaxy properties.
+"""Example script to demonstrate reading in subhalo/galaxy properties.
 
 Quantities are read in both from the Subfind catalogues (slow, but works for
 all data) and from the pre-compiled high-level tables (faster, but only for
