@@ -24,22 +24,22 @@ These are relatively straightforward, and probably the best ones to try out firs
 +---------------------------+-------------------------------------------+--------------------------+
 | Name                      | Library/simulation features covered       | Science aspect           |
 +===========================+===========================================+==========================+
-| ``sfr_mstar_plot.py``     | - Read/write data from/to HDF5 files      | Plot M\ :sub:`star` -    |
+| :ref:`x-sfr-mstar-plot`   | - Read/write data from/to HDF5 files      | Plot M\ :sub:`star` -    |
 |                           | - Read (full) subhalo catalogue |br|      | SFR relation             | 
 |                           |   (:class:`SplitFile`)                    |                          |
 |                           | - Avoiding the simulation boundary        |                          |
 +---------------------------+-------------------------------------------+--------------------------+
-| ``subhalo_map.py``        | Use :class:`SplitFile` to                 | Plot subhaloes |br|      |
+| :ref:`x-subhalo-map`      | Use :class:`SplitFile` to                 | Plot subhaloes |br|      |
 |                           |                                           | around a cluster         |
 |                           | - read an individual FOF catalogue entry  |                          |
 |                           | - read a (full) subhalo catalogue         |                          | 
 +---------------------------+-------------------------------------------+--------------------------+
-| ``star_density.py``       | - Read data for one subhalo |br|          | Plot galaxy image        |
+| :ref:`x-star-density`     | - Read data for one subhalo |br|          | Plot galaxy image        |
 |                           |   (:class:`SplitFile`)                    |                          |
 |                           | - Read particles in a small volume |br|   |                          |
 |                           |   (:class:`ReadRegion`)                   |                          |
 +---------------------------+-------------------------------------------+--------------------------+
-| ``phase_diagram.py``      | - Use :class:`SplitFile` to               | Plot the gas phase |br|  |
+| :ref:`x-phase-diagram`    | - Use :class:`~hydrangea.SplitFile` to    | Plot the gas phase |br|  |
 |                           |                                           | diagram of a simulation  |
 |                           |   - read an entire particle catalogue     |                          |
 |                           |   - read an individual entry from the     |                          |
@@ -47,6 +47,14 @@ These are relatively straightforward, and probably the best ones to try out firs
 |                           |                                           |                          |
 |                           | - Avoiding the simulation boundary        |                          |
 +---------------------------+-------------------------------------------+--------------------------+
+
+..  toctree::
+    :hidden:
+
+    examples/sfr_mstar_plot
+    examples/subhalo_map
+    examples/star_density
+    examples/phase_diagram
 
 
 .. _complex_examples:
@@ -60,35 +68,46 @@ These examples are slightly longer and/or more complex than the "basic" examples
 +---------------------------+-------------------------------------------+--------------------------+
 | Name                      | Library/simulation features covered       | Science aspect           |
 +===========================+===========================================+==========================+
-| ``galaxy_stars.py``       | :func:`in_subhalo()` function to |br|     | Plot images of a |br|    |
+| :ref:`x-galaxy-stars`     | :func:`in_subhalo()` function to |br|     | Plot images of a |br|    |
 |                           | test particles for subhalo membership     | disrupting galaxy        | 
 +---------------------------+-------------------------------------------+--------------------------+
-| ``galaxy_evolution.py``   | - Follow one galaxy's evolution           | Plot M\ :sub:`star` and  |
+| :ref:`x-galaxy-evolution` | - Follow one galaxy's evolution           | Plot M\ :sub:`star` and  |
 |                           | - Find all progenitors of a galaxy |br|   | Z\ :sub:`star` |br|      | 
 |                           |   in a given snapshot                     | evolution for a galaxy   |
 +---------------------------+-------------------------------------------+--------------------------+
-| ``sf_history.py``         | - Use :class:`ReadRegion` to load         | Plot SF history of |br|  |
+| :ref:`x-sf-history`       | - Use :class:`ReadRegion` to load         | Plot SF history of |br|  |
 |                           |   particles |br| within the resolved      | central and satellite    |
 |                           |   simulation region                       | |br| galaxies            |
 |                           | - Virtual ``SubhaloIndex``                |                          | 
 |                           |   element to |br| connect particles to    |                          |
 |                           |   their subhaloes                         |                          |
 +---------------------------+-------------------------------------------+--------------------------+
-| ``snipshot_age.py``       | - Working with snipshots                  | Plot stellar age         |
+| :ref:`x-snipshot-age`     | - Working with snipshots                  | Plot stellar age         |
 |                           | - :class:`Gate` class for matching        | map |br| of a galaxy     |
 |                           |   entries |br| between two catalogues     | at a |br| specified time |
 +---------------------------+-------------------------------------------+--------------------------+
-| ``trace_particles.py``    | :func:`find_id_indices` function to       | Phase diagram of gas     |
+| :ref:`x-trace-particles`  | :func:`find_id_indices` function to       | Phase diagram of gas     |
 |                           | match |br| entries between catalogues     | |br| destined to sit in  |
 |                           | |br| (alternative to :class:`Gate`        | the |br| cluster core    |
 |                           | class)                                    |                          |
 +---------------------------+-------------------------------------------+--------------------------+
-| ``thermal_history.py``    | - Use full set of snip- and snapshots     | Path of one particle     |
+| :ref:`x-thermal-history`  | - Use full set of snip- and snapshots     | Path of one particle     |
 |                           | - Alternative units in :class:`SplitFile` | |br| across the phase    |
 |                           |   |br| and :class:`ReadRegion` readers    | |br| diagram over time   |
 +---------------------------+-------------------------------------------+--------------------------+
-| ``orbits.py``             | - Match subhaloes between HYDRO and |br|  | Compare the orbit of     |
+| :ref:`x-orbits`           | - Match subhaloes between HYDRO and |br|  | Compare the orbit of     |
 |                           |   DM-only simulations                     | |br| a galaxy in HYDRO   |
 |                           | - Interpolated orbits for very high |br|  | |br| and DM-only runs    |
 |                           |   time resolution                         |                          |
 +---------------------------+-------------------------------------------+--------------------------+
+
+..  toctree::
+    :hidden:
+
+    examples/galaxy_stars
+    examples/galaxy_evolution
+    examples/sf_history
+    examples/snipshot_age
+    examples/trace_particles
+    examples/thermal_history
+    examples/orbits
