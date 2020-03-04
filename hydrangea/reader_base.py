@@ -28,11 +28,12 @@ class ReaderBase:
         units_name : str
             The unit system to calculate the conversion factor for.
             Options are (case-insensitive):
-                'data' --> Exactly as stored in file (i.e. no conversion)
-                'clean' --> As in file, but without `a' and `h' factors
-                'astro' --> Astronomically useful units (e.g. M_Sun, pMpc)
-                'si' --> SI units
-                'cgs' --> CGS units
+
+            - ``'data'`` --> Exactly as stored in file (i.e. no conversion)
+            - ``'clean'`` --> As in file, but without `a` and `h` factors
+            - ``'astro'`` --> Astronomically useful units (e.g. M_Sun, pMpc)
+            - ``'si'`` --> SI units
+            - ``'cgs'`` --> CGS units
 
         Returns
         -------
@@ -48,14 +49,14 @@ class ReaderBase:
 
         Examples
         --------
-        import hydrangea as hy
-        snap_file = hy.objects.Simulation(index=0).get_snap_file(29)
-        stars = hy.SplitFile(snap_file, part_type=4)
-        stars.get_unit_conversion('Mass', 'astro')
-        >>> 14755791648.22193
+        >>> import hydrangea as hy
+        >>> snap_file = hy.objects.Simulation(index=0).get_snap_file(29)
+        >>> stars = hy.SplitFile(snap_file, part_type=4)  # or hy.ReadRegion
+        >>> stars.get_unit_conversion('Mass', 'astro')
+        14755791648.22193
 
-        stars.get_unit_conversion('CentreOfPotential', 'SI')
-        >>> 4.553162166150214e+22
+        >>> stars.get_unit_conversion('CentreOfPotential', 'SI')
+        4.553162166150214e+22
         """
         if units_name.lower() == 'data':
             data_to_other = 1
@@ -167,7 +168,7 @@ class ReaderBase:
 
     @property
     def aexp(self):
-        """Get the expansion factor of the data set."""
+        """Expansion factor of the data set."""
         if '_aexp' not in dir(self):
             self._aexp = hd.read_attribute(self.file_name, 'Header',
                                            'ExpansionFactor', require=True)
@@ -175,28 +176,28 @@ class ReaderBase:
 
     @property
     def redshift(self):
-        """Get the redshift of the data set."""
+        """Redshift of the data set."""
         if '_zred' not in dir(self):
             self._zred = ht.aexp_to_time(self.aexp, 'zred')
         return self._zred
 
     @property
     def time(self):
-        """Get the age of the Universe of the data set [Gyr]."""
+        """Age of the Universe of the data set [Gyr]."""
         if '_age' not in dir(self):
             self._time = ht.aexp_to_time(self.aexp, 'age')
         return self._time
 
     @property
     def lookback_time(self):
-        """Get the lookback time to the data set from z = 0 [Gyr]."""
+        """Lookback time to the data set from z = 0 [Gyr]."""
         if '_lbt' not in dir(self):
             self._lbt = ht.aexp_to_time(self.aexp, 'lbt')
         return self._lbt
 
     @property
     def m_dm(self):
-        """Get the DM particle mass of a snapshot."""
+        """DM particle mass (only for snap-/snipshots)."""
         if '_m_dm' not in dir(self):
             if not self.base_group.startswith('PartType'):
                 print("*** Looks like you are trying to load m_dm for "
@@ -207,7 +208,7 @@ class ReaderBase:
 
     @property
     def m_baryon(self):
-        """Get the initial baryon mass of a snapshot."""
+        """Initial baryon mass (only for snap-/snipshots)."""
         if '_m_baryon' not in dir(self):
             if not self.base_group.startswith('PartType'):
                 print("*** Looks like you are trying to load m_baryon for "
@@ -279,7 +280,13 @@ class ReaderBase:
 
     @property
     def subfind_file(self):
-        """Subfind catalogue file belonging to a snapshot."""
+        """Subfind catalogue file associated to a snapshot.
+
+        This must be set explicitly by the user. It can point to the
+        output's own subfind file (if it exists), but does not need to:
+        in the latter case, it allows matching particles to structures
+        at another point in time.
+        """
         if '_subfind_file' not in dir(self):
             print("Need to set a corresponding subfind file!")
             set_trace()
