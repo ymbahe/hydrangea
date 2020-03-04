@@ -51,13 +51,11 @@ Library documentation
 * :ref:`Reading multi-file HDF5 catalogues <split_file>`
 * :ref:`Reading sub-volumes of a particle catalogue <read_region>`
 * :ref:`Cross-matching tools <crossref>`
-* :ref:`Unit conversions <units>`
 * :ref:`Various other tools <tools>`
 
 
 Other
 -----
-* :ref:`Revision history <revision>`
 * :ref:`Licences and legal info <legal>` 
 
 
