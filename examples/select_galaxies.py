@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Demonstration script to select galaxies based on multiple quantities.
 
 It illustrates how to retrieve galaxy (subhalo) properties from the
@@ -13,7 +12,7 @@ import hydrangea as hy
 import matplotlib.pyplot as plt
 
 # Set script parameters
-sim_index = 12                 # Which simulation do we want?
+sim_index = 8                  # Which simulation do we want?
 snap_index = 29                # Which snapshot do we want to analyse?
 imsize = 10.0                  # Half-sidelength of the map, in Mpc
 
@@ -61,6 +60,7 @@ subhaloes = hy.SplitFile(subfind_file, 'Subhalo')
 # the simulation edge. Values of 0 or 1 usually indicate the subhalo is
 # fine, higher values should be treated with caution. This is not in the
 # main Subfind catalogue, so has to be loaded from an 'extra' file.
+print("Read in boundary flag:")
 subhalo_extra_file = sim.sh_extra_loc
 data_set = f'Snapshot_{snap_index:03d}/BoundaryFlag'
 boundary_flag = hy.hdf5.read_data(subhalo_extra_file,  # Name of HDF5 file
@@ -73,17 +73,19 @@ boundary_flag = hy.hdf5.read_data(subhalo_extra_file,  # Name of HDF5 file
 # which does have M200 recorded. To keep everyone on their toes, the
 # required 'GroupNumber' property is *1-indexed*, so have to subtract 1
 # to convert it to (standard) 0-indexing:
+print("Find subhaloes' M200:")
 fof_index = subhaloes.GroupNumber - 1
 fof = hy.SplitFile(subfind_file, 'FOF')  # Set up analogous reader for FOF
 
 # Read the M200crit values for all FOFs, and pull out the appropriate one
 # for each subhalo (i.e., the one for its own FOF)
-subhalo_m200 = fof.Group_M_200Crit[fof_index]
+subhalo_m200 = fof.Group_M_Crit200[fof_index]
 
 # For satellite status, the catalogue includes a property 'SubGroupNumber'
 # which is 0 for centrals, and > 0 for satellites. Let's convert this to
 # a binary (0 or 1) flag that can be directly compared to the
 # satellite_status variable defined on top:
+print("Find subhaloes' satellite status:")
 subhalo_sat_flag = subhaloes.SubGroupNumber
 subhalo_sat_flag[subhalo_sat_flag > 0] = 1
 
@@ -94,6 +96,7 @@ subhalo_sat_flag[subhalo_sat_flag > 0] = 1
 # adjoining conditions is true). Note that np.nonzero returns a list of
 # arrays, so we explicitly have to select the first (and only) entry of that
 # list here (hence the final '[0]').
+print("Select matching subhaloes")
 sub_indices = np.nonzero((subhaloes.Mass >= min_subhalo_mass) &
                          (subhaloes.MassType[:, 4] >= min_stellar_mass) &
                          (subhaloes.MassType[:, 4] < max_stellar_mass) &
@@ -113,6 +116,7 @@ galaxy_catalogue = sim.fgt_loc
 # (ii)  we specify reading a particular 'column' (=snapshot) from the
 #       2D arrays with the 'read_index' and 'index_dim' key words;
 # (iii) most of the data is stored in log units (c.f. subhaloes above)
+print("Load data from galaxy tables")
 galaxy_log_mass = hy.hdf5.read_data(galaxy_catalogue, 'Msub',
                                     read_index=snap_index, index_dim=1)
 galaxy_log_mstar = hy.hdf5.read_data(galaxy_catalogue, 'Mstar',
@@ -128,6 +132,7 @@ galaxy_boundary_flag = hy.hdf5.read_data(galaxy_catalogue, 'ContFlag',
 
 # Select the galaxy IDs satisfying our various criteria (see above for
 # details on np.nonzero).
+print("Select galaxies based on tables")
 gal_ids = np.nonzero((galaxy_log_mass >= np.log10(min_subhalo_mass)) &
                      (galaxy_log_mstar >= np.log10(min_stellar_mass)) &
                      (galaxy_log_mstar < np.log10(max_stellar_mass)) &
@@ -142,14 +147,17 @@ gal_ids = np.nonzero((galaxy_log_mass >= np.log10(min_subhalo_mass)) &
 # and snap_index (outside the reader -- can only specify one inside).
 # Note that we do not need to specify index_dim here, because we use
 # the default (0).
+print("Load galaxy to subhalo conversion index")
 sub_indices_from_gal = hy.hdf5.read_data(
     galaxy_catalogue, 'SHI', read_index=gal_ids)[:, snap_index]
 
 # Verify that the two methods give the same answer
 print(f"Found {len(sub_indices)} subhaloes from Subfind, "
-      f"{len(sub_indices_from_gal)} from galaxy catalogues.\n"
-      f"There are {np.count_nonzero(sub_indices-sub_indices_from_gal)} "
-      f"differences between the two returned index arrays.")
+      f"{len(sub_indices_from_gal)} from galaxy catalogues.")
+
+num_different = np.count_nonzero(np.sort(sub_indices)
+                                 - np.sort(sub_indices_from_gal))
+print(f"There are {num_different} differences between the two index arrays.")
 
 # ------ Final part: plot the location of selected subhaloes ------------
 
