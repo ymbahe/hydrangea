@@ -34,6 +34,12 @@ These are relatively straightforward, and probably the best ones to try out firs
 |                           | - read an individual FOF catalogue entry  |                          |
 |                           | - read a (full) subhalo catalogue         |                          | 
 +---------------------------+-------------------------------------------+--------------------------+
+| :ref:`x-select-galaxies`  | - Read data for all subhaloes |br|        | Find galaxies matching   |
+|                           |   (:class:`~hydrangea.SplitFile`)         | |br| a set of criteria   |
+|                           | - Read data for one FOF group |br|        | |br| (analogous to a     |
+|                           |   (:class:`~hydrangea.SplitFile`)         | |br| data base query)    |
+|                           | - Read data from 'simple' HDF5 files      |                          | 
++---------------------------+-------------------------------------------+--------------------------+
 | :ref:`x-star-density`     | - Read data for one subhalo |br|          | Plot galaxy image        |
 |                           |   (:class:`SplitFile`)                    |                          |
 |                           | - Read particles in a small volume |br|   |                          |
@@ -53,6 +59,7 @@ These are relatively straightforward, and probably the best ones to try out firs
 
     examples/sfr_mstar_plot
     examples/subhalo_map
+    examples/select_galaxies
     examples/star_density
     examples/phase_diagram
 
