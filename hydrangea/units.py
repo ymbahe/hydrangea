@@ -113,7 +113,7 @@ SUBHALO_DIMENSIONS = {
     'IDMostBound': None,
     'InertiaTensor': DIM_MOMENT_OF_INERTIA,
     'InitialMassWeightedBirthZ': None,
-    'InitialMassWeightedStellarAge': None,
+    'InitialMassWeightedStellarAge': DIM_TIME,
     'IronFromSNIa': None,
     'IronFromSNIaSmoothed': None,
     'KineticEnergy': DIM_ENERGY,
