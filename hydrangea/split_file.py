@@ -679,7 +679,7 @@ class SplitFile(ReaderBase):
             self._print(1, "Truncating upper read end to {:d} (was {:d})"
                         .format(self.file_offsets[-1], index))
             file = self.num_files - 1
-            offset = self.file_ofsets[-1] - self.file_offsets[-2]
+            offset = self.file_offsets[-1] - self.file_offsets[-2]
         return (file, offset)
 
 
