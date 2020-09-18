@@ -502,6 +502,23 @@ class SplitFile(ReaderBase):
                 else:
                     return None
 
+            elif ("_".join(file_name_parts[:3]) == 'fof_subhalo_tab' and
+                 self.sim_type == 'Illustris'):
+                self._print(2, "   Illustris Subfind catalogue detected... ",
+                    end="")
+                if self.base_group == 'Group':
+                    if file is None:
+                        num_elem = self._count_elements_sf_illustris_group()
+                    else:
+                        num_elem = self._count_file_elements_sf_illustris_group(file)
+                elif self.base_group == 'Subhalo':
+                    if file is None:
+                        num_elem = self._count_elements_sf_illustris_subhalo()
+                    else:
+                        num_elem = self._count_file_elements_sf_illustris_subhalo(file)
+
+
+
         # In all other cases, don't know how to pre-determine
         # element count, so need to find out from individual files (later).
         else:
@@ -525,10 +542,20 @@ class SplitFile(ReaderBase):
         return hd.read_attribute(
             self.file_name, 'Header', 'TotNgroups', require=True)
 
+    def _count_elements_sf_illustris_group(self):
+        """Count number of FOF groups in Illustris-Subfind catalogue."""
+        return hd.read_attribute(
+            self.file_name, 'Header', 'Ngroups_Total', require=True)
+
     def _count_elements_sf_subhalo(self):
         """Count number of subhaloes in Subfind catalogue."""
         return hd.read_attribute(
             self.file_name, 'Header', 'TotNsubgroups', require=True)
+
+    def _count_elements_sf_illustris_subhalo(self):
+        """Count number of subhaloes in Illustris-Subfind catalogue."""
+        return hd.read_attribute(
+            self.file_name, 'Header', 'Nsubgroups_Total', require=True)
 
     def _count_elements_sf_ids(self):
         """Count number of particle IDs in Subfind catalogue."""
@@ -547,11 +574,23 @@ class SplitFile(ReaderBase):
             self._swap_file_name(self.file_name, file),
             'Header', 'Ngroups', require=True)
 
+    def _count_file_elements_sf_illustris_group(self, file):
+        """Count number of FOF groups in Illustris-Subfind catalogue."""
+        return hd.read_attribute(
+            self._swap_file_name(self.file_name, file),
+            'Header', 'Ngroups_ThisFile', require=True)
+
     def _count_file_elements_sf_subhalo(self, file):
         """Count number of subhaloes in Subfind catalogue."""
         return hd.read_attribute(
             self._swap_file_name(self.file_name, file),
             'Header', 'Nsubgroups', require=True)
+
+    def _count_file_elements_sf_illustris_subhalo(self, file):
+        """Count number of subhaloes in Subfind catalogue."""
+        return hd.read_attribute(
+            self._swap_file_name(self.file_name, file),
+            'Header', 'Nsubgroups_ThisFile', require=True)
 
     def _count_file_elements_sf_ids(self, file):
         """Count number of particle IDs in Subfind catalogue."""
