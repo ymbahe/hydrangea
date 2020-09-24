@@ -241,6 +241,15 @@ def get_dimensions(base_group, dataset_name):
         return None
 
     if base_group == 'Subhalo':
+
+        # Special treatment for aperture values, since these have ambiguous
+        # data set names...
+        if dataset_name.startswith('ApertureMeasurements'):
+            real_name = dataset_name.split('/')[1]
+            if real_name not in ['Mass', 'SFR', 'VelDisp']:
+                print(f"Unexpected aperture measurement '{real_name}'!")
+                set_trace()
+
         try:
             dimension = SUBHALO_DIMENSIONS[real_name]
         except KeyError:
