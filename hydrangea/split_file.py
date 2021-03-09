@@ -86,6 +86,7 @@ class SplitFile(ReaderBase):
             return
         self.file_name = file_name
         self.sim_type = sim_type
+        self.read_units = self.units   # For compatibility with ReadRegion
 
         # Set up group name, if needed from particle type
         if part_type is not None:
@@ -135,8 +136,6 @@ class SplitFile(ReaderBase):
             units = units.lower()
         if verbose is None:
             verbose = self.verbose
-
-        self.read_units = self.units   # For compatibility with ReadRegion
 
         # Check that setup has been done properly
         if self.num_files is None:
