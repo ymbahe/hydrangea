@@ -4,6 +4,7 @@ import h5py as h5
 import hydrangea.tools as ht
 import hydrangea.units as hu
 import hydrangea.hdf5 as hd
+import numpy as np
 
 from pdb import set_trace  # [Will be used later]
 
@@ -260,6 +261,10 @@ class ReaderBase:
             if 'GroupIndex' not in dir(self):
                 self.GroupIndex = self.find_group(group_type='fof')
             return self.GroupIndex
+        elif name_actual == 'Mass' and self.base_group == 'PartType1':
+            if 'Mass' not in dir(self):
+                self.Mass = np.zeros(self.num_elem) + self.m_dm
+            return self.Mass
         else:
             return self.read_data(name_actual, store=None, trial=True)
 
