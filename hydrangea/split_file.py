@@ -435,7 +435,7 @@ class SplitFile(ReaderBase):
         If `read_range` is specified, the length of this range.
         Otherwise, the total number of entries in the catalogue.
         """
-        if _num_entries not in dir(self):
+        if '_num_entries' not in dir(self):
             if self.read_index is not None:
                 if isinstance(self.read_index, int):
                     self._num_entries = 1
