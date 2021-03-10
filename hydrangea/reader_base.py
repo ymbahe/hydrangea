@@ -253,17 +253,11 @@ class ReaderBase:
             name_actual = name.replace('__', '/')
         else:
             name_actual = name
-        if name_actual == 'SubhaloIndex':
-            if 'SubhaloIndex' not in dir(self):
-                self.SubhaloIndex = self.find_group(group_type='subfind')
-            return self.SubhaloIndex
-        elif name_actual == 'GroupIndex':
-            if 'GroupIndex' not in dir(self):
-                self.GroupIndex = self.find_group(group_type='fof')
-            return self.GroupIndex
-        elif name_actual == 'Mass' and self.base_group == 'PartType1':
+
+        # Special treatment for Mass, so we can emulate it for DM particles
+        if name_actual == 'Mass' and self.base_group == 'PartType1':
             if 'Mass' not in dir(self):
-                self.Mass = np.zeros(self.num_elem) + self.m_dm
+                self.Mass = self._get_dm_masses()
             return self.Mass
         else:
             return self.read_data(name_actual, store=None, trial=True)

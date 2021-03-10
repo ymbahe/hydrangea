@@ -681,6 +681,19 @@ class SplitFile(ReaderBase):
 
             self._file_offsets[ifile+1] = self._file_offsets[ifile] + length
 
+    def _get_dm_masses(self):
+        """Construct an array of DM particle masses."""
+        if self.base_group != 'PartType1':
+            print("*** Cannot construct DM particle masses for this "
+                  "SplitFile type. ***")
+            set_trace()
+        if self.num_elem is None:
+            print("*** Cannot construct DM particle masses -- unknown "
+                  "total number of particles. ***")
+            set_trace()
+
+        return np.zeros(self.num_elem) + self.m_dm
+
     @property
     def read_start(self):
         """File and offset of first element to read."""
