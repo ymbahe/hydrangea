@@ -170,9 +170,17 @@ class ReaderBase:
     def aexp(self):
         """Expansion factor of the data set."""
         if '_aexp' not in dir(self):
-            self._aexp = hd.read_attribute(self.file_name, 'Header',
-                                           'ExpansionFactor', require=True)
-        return self._aexp
+
+            if self.sim_type == 'Eagle':
+                self._aexp = hd.read_attribute(self.file_name, 'Header',
+                                               'ExpansionFactor', require=True)
+            elif self.sim_type == 'Illustris':
+                self._aexp = hd.read_attribute(self.file_name, 'Header',
+                                               'Redshift', require=True)
+                self._aexp = 1 / (1+self._aexp)
+            else:
+                print("Unknown simulation type!")
+            return self._aexp
 
     @property
     def redshift(self):
