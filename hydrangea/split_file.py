@@ -504,8 +504,10 @@ class SplitFile(ReaderBase):
 
             elif ("_".join(file_name_parts[:3]) == 'fof_subhalo_tab' and
                  self.sim_type == 'Illustris'):
-                self._print(2, "   Illustris Subfind catalogue detected... ",
-                    end="")
+                if file is None:
+                    self._print(2,
+                                "   Illustris Subfind catalogue detected... ",
+                                end="")
                 if self.base_group == 'Group':
                     if file is None:
                         num_elem = self._count_elements_sf_illustris_group()
