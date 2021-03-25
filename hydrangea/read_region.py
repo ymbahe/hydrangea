@@ -1046,6 +1046,18 @@ class ReadRegion(ReaderBase):
                     .format(self.num_segments,
                             self.num_segments/len(sorter)*100))
 
+    def _get_dm_masses(self):
+        """Construct an array of DM particle masses."""
+        if self.base_group != 'PartType1':
+            print("*** Cannot construct DM particle masses for this "
+                  "ReadRegion type. ***")
+            set_trace()
+        if self.num_particles_exact is None:
+            print("*** Cannot construct DM particle masses -- unknown "
+                  "total number of particles. ***")
+            set_trace()
+
+        return np.zeros(self.num_particles_exact) + self.m_dm
 
 # ----------- Below are short private helper functions ----------------------
 

@@ -86,6 +86,7 @@ class SplitFile(ReaderBase):
             return
         self.file_name = file_name
         self.sim_type = sim_type
+        self.read_units = self.units   # For compatibility with ReadRegion
 
         # Set up group name, if needed from particle type
         if part_type is not None:
@@ -135,8 +136,6 @@ class SplitFile(ReaderBase):
             units = units.lower()
         if verbose is None:
             verbose = self.verbose
-
-        self.read_units = self.units   # For compatibility with ReadRegion
 
         # Check that setup has been done properly
         if self.num_files is None:
@@ -429,6 +428,28 @@ class SplitFile(ReaderBase):
             set_trace()
 
     @property
+    def num_entries(self):
+        """Number of entries in output.
+
+        If `read_index` is specified, the number of elements in it.
+        If `read_range` is specified, the length of this range.
+        Otherwise, the total number of entries in the catalogue.
+        """
+        if '_num_entries' not in dir(self):
+            if self.read_index is not None:
+                if isinstance(self.read_index, int):
+                    self._num_entries = 1
+                else:
+                    self._num_entries = len(self.read_index)
+            elif self.num_elem is not None:
+                self._num_entries = self.num_elem
+            else:
+                print("*** Could not determine number of output entries..."
+                      "***")
+                set_trace()
+        return self._num_entries
+
+    @property
     def num_elem(self):
         """Number of catalogue entries to read.
 
@@ -683,6 +704,19 @@ class SplitFile(ReaderBase):
                 return
 
             self._file_offsets[ifile+1] = self._file_offsets[ifile] + length
+
+    def _get_dm_masses(self):
+        """Construct an array of DM particle masses."""
+        if self.base_group != 'PartType1':
+            print("*** Cannot construct DM particle masses for this "
+                  "SplitFile type. ***")
+            set_trace()
+        if self.num_entries is None:
+            print("*** Cannot construct DM particle masses -- unknown "
+                  "number of particles in output. ***")
+            set_trace()
+
+        return np.zeros(self.num_entries) + self.m_dm
 
     @property
     def read_start(self):
