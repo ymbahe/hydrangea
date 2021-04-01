@@ -435,7 +435,7 @@ class SplitFile(ReaderBase):
         If `read_range` is specified, the length of this range.
         Otherwise, the total number of entries in the catalogue.
         """
-        if _num_entries not in dir(self):
+        if '_num_entries' not in dir(self):
             if self.read_index is not None:
                 if isinstance(self.read_index, int):
                     self._num_entries = 1
@@ -525,8 +525,10 @@ class SplitFile(ReaderBase):
 
             elif ("_".join(file_name_parts[:3]) == 'fof_subhalo_tab' and
                  self.sim_type == 'Illustris'):
-                self._print(2, "   Illustris Subfind catalogue detected... ",
-                    end="")
+                if file is None:
+                    self._print(2,
+                                "   Illustris Subfind catalogue detected... ",
+                                end="")
                 if self.base_group == 'Group':
                     if file is None:
                         num_elem = self._count_elements_sf_illustris_group()
