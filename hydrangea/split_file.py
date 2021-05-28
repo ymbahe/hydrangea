@@ -501,6 +501,12 @@ class SplitFile(ReaderBase):
                 return None    # Can't determine element numbers then
 
         # Deal with subfind catalogue files
+        elif file_name_parts[0] == 'galaxyMagnitudes':
+            if file is None:
+                num_elem = self._count_elements_sf_subhalo()
+            else:
+                num_elem = self._count_file_elements_sf_subhalo(file)
+
         elif len(file_name_parts) >= 2:
             if "_".join(file_name_parts[:3]) == 'eagle_subfind_tab':
                 if file is None:

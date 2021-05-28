@@ -345,6 +345,7 @@ def form_files(sim_dir, index, types='sub', snep_type='snap'):
         - ``'fof'`` : Subfind FOF catalogue
         - ``'subpart'`` : Subfind particle catalogue
         - ``'partmag'`` : Magnitudes of star particles (Hydrangea only)
+        - ``'galmag'`` : Galaxy-integrated magnitudes (under development)
 
     snep_type : string, optional
         Snepshot type to construct file(s) for: 'snap[shot]' (default)
@@ -391,6 +392,11 @@ def form_files(sim_dir, index, types='sub', snep_type='snap'):
             if s_type != 'snap':
                 raise Exception("Stellar magnitudes only available for "
                                 "snapshots.")
+        elif itype.lower() == 'galmag':
+            names = ('groups', 'galaxyMagnitudes_EMILES_PDXX_DUST_CH')
+            if s_type != 'snap':
+                raise Exception("Stellar magnitudes only available for "
+                                "snapshots.")
         else:
             raise Exception("Data type '" + itype + "' is not understood."
                             "Please try another one.")
@@ -402,7 +408,7 @@ def form_files(sim_dir, index, types='sub', snep_type='snap'):
                 set_trace()
 
         # Build appropriate file name (different for magnitudes):
-        if itype == 'partmag':
+        if itype in ['galmag', 'partmag']:
             ifile = ("{0:s}/data/stars_extra/{1:s}_{2:s}_{3:s}/"
                      "{4:s}_{2:s}_{3:s}.0.hdf5"
                      .format(sim_dir,

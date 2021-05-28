@@ -125,6 +125,21 @@ class Simulation:
         """
         return hy.form_files(self.run_dir, index, types='partmag')
 
+    def get_galaxy_magnitude_file(self, index):
+        """Form the (first) file of a given galaxy magnitude catalogue.
+
+        Parameters
+        ----------
+        index : int
+            The index of the snapshot for which to form the file.
+
+        Returns
+        -------
+        file_path : str
+            The path to the first file of the specified catalogue.
+        """
+        return hy.form_files(self.run_dir, index, types='galmag')
+
     def get_snap_file(self, index):
         """Shorthand alias for :meth:`get_snapshot_file`."""
         return self.get_snapshot_file(index)
