@@ -135,7 +135,11 @@ class ReadRegion(ReaderBase):
         self.file_name = file_name
         self.pt_num = part_type
         self.base_group = "PartType{:d}" .format(part_type)
-        self.coordinates = np.array([*anchor, *size], dtype=float)
+
+        if np.isscalar(size):
+            self.coordinates = np.array([*anchor, size], dtype=float)
+        else:
+            self.coordinates = np.array([*anchor, *size], dtype=float)
         self.verbose = verbose
         self.exact = exact
         self.load_full = load_full
