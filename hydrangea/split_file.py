@@ -791,8 +791,8 @@ def get_subfind_index(ids, subfind_file, return_matched=False):
     'subhalo index' data set in snapshot catalogues. Depending on
     circumstances, other approaches may be faster.
     """
-    subfind_ids = SplitFile(subfind_file, 'IDs', sim_type=self.sim_type)
-    subfind_cat = SplitFile(subfind_file, 'Subhalo', sim_type=self.sim_type)
+    subfind_ids = SplitFile(subfind_file, 'IDs', sim_type='Eagle')
+    subfind_cat = SplitFile(subfind_file, 'Subhalo', sim_type='Eagle')
     index_in_ids = hx.find_id_indices(ids, subfind_ids.ParticleID)[0]
     subhalo_index = ht.ind_to_block(index_in_ids, subfind_cat.SubOffset,
                                     subfind_cat.SubLength)
