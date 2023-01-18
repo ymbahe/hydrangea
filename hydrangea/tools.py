@@ -388,14 +388,15 @@ def form_files(sim_dir, index, types='sub', snep_type='snap'):
         elif itype.lower() == 'fof':
             names = ('groups', 'group_tab')
         elif itype.lower() == 'partmag':
-            names = ('snapshot', 'partMags_EMILES_PDXX_DUST_CH')
+            names = ('stars_extra/snapshot', 'partMags_EMILES_PDXX_DUST_CH')
             if s_type != 'snap':
                 raise Exception("Stellar magnitudes only available for "
                                 "snapshots.")
         elif itype.lower() == 'galmag':
-            names = ('groups', 'galaxyMagnitudes_EMILES_PDXX_DUST_CH')
+            names = ('stars_extra/groups',
+                     'galaxyMagnitudes_EMILES_PDXX_DUST_CH')
             if s_type != 'snap':
-                raise Exception("Stellar magnitudes only available for "
+                raise Exception("Stellar magnitudes are only available for "
                                 "snapshots.")
         else:
             raise Exception("Data type '" + itype + "' is not understood."
@@ -409,7 +410,7 @@ def form_files(sim_dir, index, types='sub', snep_type='snap'):
 
         # Build appropriate file name (different for magnitudes):
         if itype in ['galmag', 'partmag']:
-            ifile = ("{0:s}/data/stars_extra/{1:s}_{2:s}_{3:s}/"
+            ifile = ("{0:s}/data/{1:s}_{2:s}_{3:s}/"
                      "{4:s}_{2:s}_{3:s}.0.hdf5"
                      .format(sim_dir,
                              names[0], index_string, z_string, names[1]))

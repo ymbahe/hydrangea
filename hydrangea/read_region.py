@@ -127,7 +127,7 @@ class ReadRegion(ReaderBase):
                  units='astro', coordinate_units=None,
                  read_units=None, map_file=None, periodic=False,
                  load_full=False, join_threshold=100, bridge_threshold=100,
-                 bridge_gap=0.5):
+                 bridge_gap=0.5, sim_type='Eagle'):
 
         stime = time.time()
 
@@ -135,13 +135,18 @@ class ReadRegion(ReaderBase):
         self.file_name = file_name
         self.pt_num = part_type
         self.base_group = "PartType{:d}" .format(part_type)
-        self.coordinates = np.array([*anchor, size], dtype=float)
+
+        if np.isscalar(size):
+            self.coordinates = np.array([*anchor, size], dtype=float)
+        else:
+            self.coordinates = np.array([*anchor, *size], dtype=float)
         self.verbose = verbose
         self.exact = exact
         self.load_full = load_full
         self.periodic = periodic
         self.anchor_style = anchor_style
-
+        self.sim_type = sim_type
+        
         if read_units is None:
             read_units = units.lower()
         else:
