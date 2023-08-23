@@ -181,7 +181,7 @@ class ReaderBase:
                 self._aexp = 1 / (1+self._aexp)
             else:
                 print("Unknown simulation type!")
-            return self._aexp
+        return self._aexp
 
     @property
     def redshift(self):

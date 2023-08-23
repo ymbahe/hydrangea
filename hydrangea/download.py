@@ -67,6 +67,7 @@ def download_data(base_dir, suite='10r200', sim=None, index=None,
           in all outputs, including snipshots
         - ``'logs'`` : Log, code, and parameter files
         - ``'magnitudes'`` : Stellar particle magnitude catalogue(s)
+        - ``'subhalo_magnitudes'``: Subhalo integrated magnitude catalogue(s)
         - ``'snapshot'`` : Snapshot particle catalogue(s)
         - ``'snipshot'`` : Snipshot particle catalogue(s)
           (*not yet implemented*)
@@ -102,7 +103,8 @@ def download_data(base_dir, suite='10r200', sim=None, index=None,
         return
 
     # Resolve shorthands for collections:
-    types = types.replace('all', ('logs snapshot subfind magnitudes highlev'))
+    types = types.replace('all', ('logs snapshot subfind magnitudes '
+                                  'subhalo_magnitudes highlev'))
     types = types.replace('highlev', ('spiderweb subhalo_extra match '
                                       'evolution_tables galaxy_coordinates '
                                       'galaxy_paths'))
@@ -111,7 +113,7 @@ def download_data(base_dir, suite='10r200', sim=None, index=None,
     if index is None:
         for itype in type_list:
             if itype in ['snapshot', 'subfind', 'magnitudes',
-                         'cantor']:
+                         'subhalo_magnitudes', 'cantor']:
                 print(f"To download data of type '{itype}', you must "
                       "specify which output indices to retrieve...")
                 return
@@ -140,6 +142,10 @@ def download_data(base_dir, suite='10r200', sim=None, index=None,
                 for iindex, index_curr in enumerate(index):
                     download_magnitudes(sim_base, index_curr,
                                         zstrings[iindex])
+            elif itype == 'subhalo_magnitudes':
+                for iindex, index_curr in enumerate(index):
+                    download_subhalo_magnitudes(sim_base, index_curr,
+                                                zstrings[iindex])
             elif itype == 'spiderweb':
                 download_spiderweb(sim_base, target='tables')
             elif itype == 'spiderweb_links':
@@ -196,6 +202,14 @@ def download_magnitudes(sim_base, index, zstring):
                  f'partMags_EMILES_PDXX_DUST_CH_{index:03d}_z{zstring}.0.hdf5')
     download_files(file_name)
 
+def download_subhalo_magnitudes(sim_base, index, zstring):
+    """Wrapper to download a subhalo magnitude file set."""
+    print(f"--- Downloading subhalo magnitudes {index} (sim {sim_base}) ---")
+    file_name = (f'{sim_base}/data/stars_extra/'
+                 f'groups_{index:03d}_z{zstring}/'
+                 f'galaxyMagnitudes_EMILES_PDXX_DUST_CH_{index:03d}_'
+                 f'z{zstring}.0.hdf5')
+    download_files(file_name)
 
 def download_spiderweb(sim_base, target='tables'):
     """Download spiderweb data."""
