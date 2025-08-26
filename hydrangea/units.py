@@ -155,7 +155,7 @@ FOF_DIMENSIONS = {
     'ContaminationMass': DIM_MASS,
     'FirstSubhaloID': None,
     'GroupCentreOfPotential': DIM_LENGTH,
-    'GroupLenth': None,
+    'GroupLength': None,
     'GroupMass': DIM_MASS,
     'GroupOffset': None,
     'Group_M_Crit200': DIM_MASS,
