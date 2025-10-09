@@ -118,14 +118,14 @@ def write_attribute(file_name, container, att_name, value,
     Note
     ----
     If the specified variable is a string, it is first converted to
-    type ``np.string_``, in order to be acceptable as HDF5 attribute.
+    type ``np.bytes_``, in order to be acceptable as HDF5 attribute.
 
     """
     # Convert None and string to HDF5-acceptable values
     if value is None:
         value = np.nan
     if isinstance(value, str):
-        value = np.string_(value)
+        value = np.bytes_(value)
 
     # Move pre-existing file out of the way if desired
     if new:
@@ -230,9 +230,9 @@ def write_data(file_name, container, array,
     # Write comment if desired (update it if it already exists):
     if comment is not None:
         if 'Comment' in dSet.attrs.keys():
-            dSet.attrs.modify('Comment', np.string_(comment))
+            dSet.attrs.modify('Comment', np.bytes_(comment))
         else:
-            dSet.attrs.create('Comment', np.string_(comment))
+            dSet.attrs.create('Comment', np.bytes_(comment))
 
     # Close the HDF5 file, and we're done.
     f.close()
@@ -260,7 +260,7 @@ def read_attribute(file_name, container, att_name,
         Raise an exception if the attribute does not exist. If False
         (default), the `default` value is returned instead.
     convert_string : bool
-        Convert an attribute of type ``np.string_`` to a standard string.
+        Convert an attribute of type ``np.bytes_`` to a standard string.
         Default: ``True``
 
     Returns
@@ -279,7 +279,7 @@ def read_attribute(file_name, container, att_name,
         raise Exception(f"Did not find specified attribute '{att_name}' in "
                         f"container '{container}'...")
 
-    if convert_string and isinstance(att, np.string_):
+    if convert_string and isinstance(att, np.bytes_):
         att = att.decode('UTF-8')
 
     return att
