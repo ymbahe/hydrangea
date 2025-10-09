@@ -278,10 +278,10 @@ class ReverseList:
 
     def __call__(self, ids, assume_valid=False):
         """Alias for query function."""
-        return self.query(ids, assume_valid=assume_valid)
+        return self.query_matched(ids, assume_valid=assume_valid)
 
     def query_matched(self, ids, assume_valid=False):
-        """Find indices eof the input (external) IDs, also listing matches.
+        """Find indices of the input (external) IDs, also listing matches.
 
         Parameters
         ----------
