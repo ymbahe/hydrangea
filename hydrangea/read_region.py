@@ -218,6 +218,8 @@ class ReadRegion(ReaderBase):
             self._print(1, "Need to load {:.1f}% of total particle catalogue\n"
                         "  ==> faster to load everything instead"
                         .format(self.num_particles/self.num_part_total * 100))
+            if exact:
+                self._find_exact_region()
 
     # -----------------------------------------------------------------------
 
